@@ -1,0 +1,9 @@
+*.ko
+*.mod.*
+*.o
+*.symvers
+.cache.mk
+*.swp
+*.tmp
+.*
+
