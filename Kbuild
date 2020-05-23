@@ -1,9 +1,15 @@
 MODNAME		?= keipm
 
 obj-m		+= $(MODNAME).o
-$(MODNAME)-y	+= main.o
+$(MODNAME)-y	+= \
+	main.o \
+	watcher/watcher.o \
+	watcher/watcher-lsm.o \
+	watcher/ksyms.o \
+	utils/string.o
 
-ccflags-y	+= -Werror -fno-stack-protector -fomit-frame-pointer
+ccflags-y	+= -Wall -fno-stack-protector
+#-Werror
 
 KBUILD_CFLAGS	:= $(filter-out -pg,$(KBUILD_CFLAGS))
 KBUILD_CFLAGS	:= $(filter-out -mfentry,$(KBUILD_CFLAGS))

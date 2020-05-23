@@ -2,6 +2,6 @@
 #define KEIPM_H_
 
 /* Define the name of this module */
-#define KEIPM "kEIPM"
+#define KEIPM "kEIPM "
 
 #endif /* KEIPM_H_ */
