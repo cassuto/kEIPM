@@ -4,7 +4,6 @@ obj-m		+= $(MODNAME).o
 $(MODNAME)-y	+= \
 	main.o \
 	watcher/watcher.o \
-	watcher/watcher-lsm.o \
 	watcher/ksyms.o \
 	utils/string.o
 
