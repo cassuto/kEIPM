@@ -1,5 +1,5 @@
 #include <linux/kallsyms.h>
-#include "string.h"
+#include <linux/string.h>
 #include "ksyms.h"
 
 struct opaque {
@@ -11,7 +11,7 @@ static int kallsyms_on_symbol(void *data, const char *name, void *module, long a
 {
     struct opaque *target = (struct opaque *)data;
     if (addr && !module) { /* don't find in modules */
-        if (0==strcmp_slow(target->name, name)) {
+        if (0==strcmp(target->name, name)) {
             target->addr = addr;
             return 1;
         }

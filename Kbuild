@@ -4,8 +4,7 @@ obj-m		+= $(MODNAME).o
 $(MODNAME)-y	+= \
 	main.o \
 	watcher/watcher.o \
-	watcher/ksyms.o \
-	utils/string.o
+	watcher/ksyms.o
 
 ccflags-y	+= -Wall -fno-stack-protector
 #-Werror
