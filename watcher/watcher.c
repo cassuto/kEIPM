@@ -13,14 +13,13 @@
 static uintptr_t p_load_elf_binary;
 static uintptr_t p_load_elf_library;
 static uintptr_t *pp_elf_format_load_elf_binary, *pp_elf_format_load_elf_library;
-
 static char pathname[PATH_MAX];
 
 typedef int (*pfn_load_elf_binary)(struct linux_binprm *bprm);
 
 static int analysis_binary(const char *pathname)
 {
-    char buf[32];
+    char buf[EI_NIDENT];
     loff_t pos = 0;
     int retval;
     struct file *file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
@@ -73,6 +72,7 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
     pfn_load_elf_binary org = (pfn_load_elf_binary)p_load_elf_binary;
 
     int i;
+    /* pointers in linux_binprm are aligned at 8 bytes boundary */
     uintptr_t *s = (uintptr_t *)bprm;
 
     for(i=0;i<sizeof(struct linux_binprm)/sizeof(uintptr_t);++i) {
