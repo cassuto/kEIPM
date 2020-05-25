@@ -7,6 +7,7 @@ ENDIF()
 
 set(SRCS
 	"${CMAKE_CURRENT_SOURCE_DIR}/elfop.c"
+    "${CMAKE_CURRENT_SOURCE_DIR}/elf-reader.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/sigtool.c"
 )
 
