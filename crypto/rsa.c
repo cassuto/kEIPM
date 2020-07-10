@@ -256,7 +256,6 @@ static int rsa_check_key_length(unsigned int len)
 int rsa_set_pub_key(struct rsa_req *req, struct rsa_key *raw_key)
 {
 	struct rsa_mpi_key *mpi_key = rsa_get_key(req);
-	int ret;
 
 	/* Free the old MPI key if any */
 	rsa_free_mpi_key(mpi_key);
@@ -284,7 +283,6 @@ err:
 int rsa_set_priv_key(struct rsa_req *req, struct rsa_key *raw_key)
 {
 	struct rsa_mpi_key *mpi_key = rsa_get_key(req);
-	int ret;
 
 	/* Free the old MPI key if any */
 	rsa_free_mpi_key(mpi_key);

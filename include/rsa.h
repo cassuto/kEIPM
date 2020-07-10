@@ -19,16 +19,6 @@ struct rsa_req {
     struct rsa_mpi_key key;
 };
 
-extern int rsa_enc(struct rsa_req *req);
-extern int rsa_dec(struct rsa_req *req);
-extern int rsa_sign(struct rsa_req *req);
-extern int rsa_verify(struct rsa_req *req);
-extern int rsa_set_pub_key(struct rsa_req *req, struct rsa_key *raw_key);
-extern int rsa_set_priv_key(struct rsa_req *req, struct rsa_key *raw_key);
-extern unsigned int rsa_max_size(struct rsa_req *req);
-extern void rsa_exit_req(struct rsa_req *req);
-
-
 /**
  * rsa_key - RSA key structure
  * @n           : RSA modulus raw byte stream
@@ -66,5 +56,14 @@ struct rsa_key {
 	size_t dq_sz;
 	size_t qinv_sz;
 };
+
+extern int rsa_enc(struct rsa_req *req);
+extern int rsa_dec(struct rsa_req *req);
+extern int rsa_sign(struct rsa_req *req);
+extern int rsa_verify(struct rsa_req *req);
+extern int rsa_set_pub_key(struct rsa_req *req, struct rsa_key *raw_key);
+extern int rsa_set_priv_key(struct rsa_req *req, struct rsa_key *raw_key);
+extern unsigned int rsa_max_size(struct rsa_req *req);
+extern void rsa_exit_req(struct rsa_req *req);
 
 #endif // RSA_H_
