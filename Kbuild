@@ -5,13 +5,17 @@ $(MODNAME)-y	+= \
 	main.o \
 	watcher/watcher.o \
 	watcher/ksyms.o \
+    utils/reader.o \
+    crypto/sha256.o \
+    crypto/rsa.o \
     cert/asn1-oid.o \
     cert/asn1-parser.o \
     cert/asn1-types.o \
     cert/x509-name.o \
     cert/x509-path.o \
     cert/x509-pubkey.o \
-    cert/x509.o
+    cert/x509.o \
+    cert/cert-validator.o
 
 ccflags-y	+= -Wall -Wno-unused-parameter -Wextra -W -fno-stack-protector
 #-Werror

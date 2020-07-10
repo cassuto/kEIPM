@@ -86,7 +86,7 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
     return (*org)(bprm);
 }
 
-int watcher_init(void)
+keipm_err_t watcher_init(void)
 {
     int i=0;
     uintptr_t *pointers;
@@ -95,8 +95,7 @@ int watcher_init(void)
     p_load_elf_library = (uintptr_t)find_kernel_entry("load_elf_library");
     
     if(!p_elf_format || !p_load_elf_binary) {
-        printk("Unrecognized kernel version!\n");
-        return 0;
+        return ERROR(kEIPM_ERR_UNSUPPORTED, "Unrecognized kernel version");
     }
 
     printk("size=%lu\n", sizeof(struct linux_binfmt));
@@ -116,7 +115,7 @@ int watcher_init(void)
         }
     }
 
-    return 0;
+    return ERROR(kEIPM_OK, NULL);
 }
 
 void watcher_uninit(void)

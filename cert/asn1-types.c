@@ -2,8 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+#include "errors.h"
 #include "asn1-parser/asn1.h"
-#include "asn1-parser/errors.h"
 #include "asn1-parser/internal/macros.h"
 
 #define SECONDS_PER_YEAR (31536000)

@@ -5,7 +5,7 @@
 #pragma once
 
 #include "asn1-parser/asn1.h"
-#include "asn1-parser/errors.h"
+#include "errors.h"
 
 #define NEXT_TOKEN(parser) RETURN_ON_ERROR(asn1_next(parser))
 #define OPTIONAL_TOKEN(parser) \

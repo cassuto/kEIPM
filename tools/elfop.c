@@ -126,6 +126,19 @@ err:
     return retval;
 }
 
+#ifdef ELF_WRITER
+
+#include <stdio.h>
+
+static long elfop_size(struct elfop_context *ep)
+{
+    long pos = ftell(ep->fp);
+    fseek(ep->fp, 0, SEEK_END);
+    long size = ftell(ep->fp);
+    fseek(ep->fp, pos, SEEK_SET);
+    return size;
+}
+
 int elfop_add_section(struct elfop_context *ep, const char *name, Elf64_Off type, const void *data, size_t dsize)
 {
     int retval = 0;
@@ -161,6 +174,8 @@ int elfop_add_section(struct elfop_context *ep, const char *name, Elf64_Off type
 err:
     return retval;
 }
+
+#endif
 
 void elfop_close(struct elfop_context **ep)
 {

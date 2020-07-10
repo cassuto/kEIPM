@@ -1,11 +1,13 @@
 #ifndef KEIPM_WATCHER_H_
 #define KEIPM_WATCHER_H_
 
+#include "errors.h"
+
 /**
  * @brief Init system watcher
  * @return status code
  */
-extern int watcher_init(void);
+extern keipm_err_t watcher_init(void);
 
 /**
  * @brief Uninit system watcher

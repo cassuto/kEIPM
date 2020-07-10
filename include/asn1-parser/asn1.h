@@ -8,6 +8,7 @@
 extern "C" {
 #endif
 
+#include "errors.h"
 #include "asn1-parser/types.h"
 #include "asn1-parser/macros.h"
 
@@ -25,22 +26,20 @@ extern "C" {
 typedef long asn1_word_t;
 typedef uintptr_t asn1_uword_t;
 
-typedef enum asinine_errno {
-	ASININE_OK              = 0,
-	ASININE_ERR_MALFORMED   = 10,
-	ASININE_ERR_MEMORY      = 11,
-	ASININE_ERR_UNSUPPORTED = 12,
-	ASININE_ERR_INVALID     = 13,
-	ASININE_ERR_EXPIRED     = 14,
-	ASININE_ERR_UNTRUSTED   = 15,
-	ASININE_ERR_DEPRECATED  = 16,
-	ASININE_ERR_NOT_FOUND   = 17,
-} asinine_errno_t;
+#define ASININE_OK              kEIPM_OK
+#define ASININE_ERR_MALFORMED   kEIPM_ERR_MALFORMED
+#define ASININE_ERR_MEMORY      kEIPM_ERR_MEMORY
+#define ASININE_ERR_UNSUPPORTED kEIPM_ERR_UNSUPPORTED
+#define ASININE_ERR_INVALID     kEIPM_ERR_INVALID
+#define ASININE_ERR_EXPIRED     kEIPM_ERR_EXPIRED
+#define ASININE_ERR_UNTRUSTED   kEIPM_ERR_UNTRUSTED
+#define ASININE_ERR_DEPRECATED  kEIPM_ERR_DEPRECATED
+#define ASININE_ERR_NOT_FOUND   kEIPM_ERR_NOT_FOUND
 
-typedef struct asinine_err {
-	asinine_errno_t errno;
-	const char *reason;
-} asinine_err_t;
+typedef enum keipm_errno asinine_errno_t;
+
+typedef keipm_err_t asinine_err_t;
+
 
 /**
  * ASN.1 identifier classes, based on X.690 11/2008 item 8.1.2.2.

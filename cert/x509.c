@@ -29,7 +29,7 @@
 #define OID_EXT_KEY_USAGE_OCSP_SIGN ASN1_CONST_OID(_OID_KEY_USAGE, 9)
 
 typedef asinine_err_t (*signature_parser_t)(
-    asn1_parser_t *, x509_signature_t *);
+	asn1_parser_t *, x509_signature_t *);
 
 typedef struct {
 	asn1_oid_t oid;
@@ -47,7 +47,7 @@ typedef struct {
 static asinine_err_t parse_optional(asn1_parser_t *, x509_cert_t *);
 static asinine_err_t parse_extensions(asn1_parser_t *, x509_cert_t *);
 static asinine_err_t parse_null_or_empty_args(
-    asn1_parser_t *, x509_signature_t *);
+	asn1_parser_t *, x509_signature_t *);
 static asinine_err_t parse_empty_args(asn1_parser_t *, x509_signature_t *);
 static asinine_err_t parse_signature_algo(asn1_parser_t *, x509_signature_t *);
 static asinine_err_t parse_validity(asn1_parser_t *, x509_cert_t *);
@@ -55,58 +55,58 @@ static asinine_err_t parse_validity(asn1_parser_t *, x509_cert_t *);
 static asinine_err_t parse_extn_key_usage(asn1_parser_t *, x509_cert_t *);
 static asinine_err_t parse_extn_ext_key_usage(asn1_parser_t *, x509_cert_t *);
 static asinine_err_t parse_extn_basic_constraints(
-    asn1_parser_t *, x509_cert_t *);
+	asn1_parser_t *, x509_cert_t *);
 static asinine_err_t parse_extn_subject_alt_name(
-    asn1_parser_t *, x509_cert_t *);
+	asn1_parser_t *, x509_cert_t *);
 
 static const signature_lookup_t signature_algorithms[] = {
-    {
-        ASN1_OID(1, 2, 840, 113549, 1, 1, 2), X509_SIGNATURE_MD2_RSA,
-        &parse_null_or_empty_args,
-    },
-    {
-        ASN1_OID(1, 2, 840, 113549, 1, 1, 4), X509_SIGNATURE_MD5_RSA,
-        &parse_null_or_empty_args,
-    },
-    {
-        ASN1_OID(1, 2, 840, 113549, 1, 1, 5), X509_SIGNATURE_SHA1_RSA,
-        &parse_null_or_empty_args,
-    },
-    {
-        ASN1_OID(1, 2, 840, 113549, 1, 1, 11), X509_SIGNATURE_SHA256_RSA,
-        &parse_null_or_empty_args,
-    },
-    {
-        ASN1_OID(1, 2, 840, 113549, 1, 1, 12), X509_SIGNATURE_SHA384_RSA,
-        &parse_null_or_empty_args,
-    },
-    {
-        ASN1_OID(1, 2, 840, 113549, 1, 1, 13), X509_SIGNATURE_SHA512_RSA,
-        &parse_null_or_empty_args,
-    },
-    {
-        ASN1_OID(1, 2, 840, 10045, 4, 3, 2), X509_SIGNATURE_SHA256_ECDSA,
-        &parse_empty_args,
-    },
-    {
-        ASN1_OID(1, 2, 840, 10045, 4, 3, 3), X509_SIGNATURE_SHA384_ECDSA,
-        &parse_empty_args,
-    },
-    {
-        ASN1_OID(1, 2, 840, 10045, 4, 3, 3), X509_SIGNATURE_SHA512_ECDSA,
-        &parse_empty_args,
-    },
-    {
-        ASN1_OID(2, 16, 840, 1, 101, 3, 4, 3, 2), X509_SIGNATURE_SHA256_DSA,
-        &parse_empty_args,
-    },
+	{
+		ASN1_OID(1, 2, 840, 113549, 1, 1, 2), X509_SIGNATURE_MD2_RSA,
+		&parse_null_or_empty_args,
+	},
+	{
+		ASN1_OID(1, 2, 840, 113549, 1, 1, 4), X509_SIGNATURE_MD5_RSA,
+		&parse_null_or_empty_args,
+	},
+	{
+		ASN1_OID(1, 2, 840, 113549, 1, 1, 5), X509_SIGNATURE_SHA1_RSA,
+		&parse_null_or_empty_args,
+	},
+	{
+		ASN1_OID(1, 2, 840, 113549, 1, 1, 11), X509_SIGNATURE_SHA256_RSA,
+		&parse_null_or_empty_args,
+	},
+	{
+		ASN1_OID(1, 2, 840, 113549, 1, 1, 12), X509_SIGNATURE_SHA384_RSA,
+		&parse_null_or_empty_args,
+	},
+	{
+		ASN1_OID(1, 2, 840, 113549, 1, 1, 13), X509_SIGNATURE_SHA512_RSA,
+		&parse_null_or_empty_args,
+	},
+	{
+		ASN1_OID(1, 2, 840, 10045, 4, 3, 2), X509_SIGNATURE_SHA256_ECDSA,
+		&parse_empty_args,
+	},
+	{
+		ASN1_OID(1, 2, 840, 10045, 4, 3, 3), X509_SIGNATURE_SHA384_ECDSA,
+		&parse_empty_args,
+	},
+	{
+		ASN1_OID(1, 2, 840, 10045, 4, 3, 3), X509_SIGNATURE_SHA512_ECDSA,
+		&parse_empty_args,
+	},
+	{
+		ASN1_OID(2, 16, 840, 1, 101, 3, 4, 3, 2), X509_SIGNATURE_SHA256_DSA,
+		&parse_empty_args,
+	},
 };
 
 static const extension_lookup_t extensions[] = {
-    {ASN1_OID(2, 5, 29, 15), &parse_extn_key_usage},
-    {ASN1_OID(2, 5, 29, 17), &parse_extn_subject_alt_name},
-    {ASN1_OID(2, 5, 29, 19), &parse_extn_basic_constraints},
-    {ASN1_OID(2, 5, 29, 37), &parse_extn_ext_key_usage},
+	{ASN1_OID(2, 5, 29, 15), &parse_extn_key_usage},
+	{ASN1_OID(2, 5, 29, 17), &parse_extn_subject_alt_name},
+	{ASN1_OID(2, 5, 29, 19), &parse_extn_basic_constraints},
+	{ASN1_OID(2, 5, 29, 37), &parse_extn_ext_key_usage},
 };
 
 asinine_err_t
@@ -124,7 +124,7 @@ x509_parse_cert(asn1_parser_t *parser, x509_cert_t *cert) {
 
 	cert->raw = token->start;
 	cert->raw_num =
-	    token->length + (size_t)(token->data - (const uint8_t *)token->start);
+		token->length + (size_t)(token->data - (const uint8_t *)token->start);
 
 	// version
 	NEXT_TOKEN(parser);
@@ -172,7 +172,7 @@ x509_parse_cert(asn1_parser_t *parser, x509_cert_t *cert) {
 
 	// subjectPublicKeyInfo
 	RETURN_ON_ERROR(x509_parse_pubkey(
-	    parser, &cert->pubkey, &cert->pubkey_params, &cert->has_pubkey_params));
+		parser, &cert->pubkey, &cert->pubkey_params, &cert->has_pubkey_params));
 
 	// Optional items (X.509 v2 and up)
 	RETURN_ON_ERROR(parse_optional(parser, cert));
@@ -187,7 +187,7 @@ x509_parse_cert(asn1_parser_t *parser, x509_cert_t *cert) {
 		// This must compare all fields parsed from signatureAlgorithm,
 		// but currently we only support algorithms without parameters.
 		return ERROR(
-		    ASININE_ERR_INVALID, "cert: signature algorithm doesn't match");
+			ASININE_ERR_INVALID, "cert: signature algorithm doesn't match");
 	}
 
 	// signature
@@ -201,7 +201,7 @@ x509_parse_cert(asn1_parser_t *parser, x509_cert_t *cert) {
 	// which breaks when validated as a real bitstring.
 	if (token->length < 1 || token->data[0] != 0) {
 		return ERROR(
-		    ASININE_ERR_MALFORMED, "cert: signature has invalid prefix");
+			ASININE_ERR_MALFORMED, "cert: signature has invalid prefix");
 	}
 	cert->signature.data = token->data + 1;
 	cert->signature.num  = token->length - 1;
@@ -212,9 +212,9 @@ x509_parse_cert(asn1_parser_t *parser, x509_cert_t *cert) {
 	}
 
 	if ((cert->key_usage & X509_KEYUSE_CRL_SIGN) != 0 &&
-	    cert->subject.num == 0) {
+		cert->subject.num == 0) {
 		return ERROR(
-		    ASININE_ERR_INVALID, "cert: missing subject name (to sign)");
+			ASININE_ERR_INVALID, "cert: missing subject name (to sign)");
 	}
 
 	return asn1_pop(parser);
@@ -243,7 +243,7 @@ parse_optional(asn1_parser_t *parser, x509_cert_t *cert) {
 		if (cert->version != X509_V3) {
 			// We should not be here if this is not a V3 cert
 			return ERROR(
-			    ASININE_ERR_INVALID, "cert: extensions should not be present");
+				ASININE_ERR_INVALID, "cert: extensions should not be present");
 		}
 
 		if (!asn1_is(token, ASN1_CLASS_CONTEXT, 3, ASN1_ENCODING_CONSTRUCTED)) {
@@ -432,9 +432,9 @@ parse_extn_key_usage(asn1_parser_t *parser, x509_cert_t *cert) {
 
 	// RFC 3279 2.3.1. to 2.3.5.
 	if ((cert->key_usage & X509_KEYUSE_DECIPHER_ONLY) != 0 &&
-	    (cert->key_usage & X509_KEYUSE_ENCIPHER_ONLY) != 0) {
+		(cert->key_usage & X509_KEYUSE_ENCIPHER_ONLY) != 0) {
 		return ERROR(ASININE_ERR_INVALID,
-		    "key usage: both decipher only and encipher only asserted");
+			"key usage: both decipher only and encipher only asserted");
 	}
 
 	/* RFC 5280, p.30: "When the keyUsage extension appears in a certificate, at
@@ -507,12 +507,12 @@ parse_extn_basic_constraints(asn1_parser_t *parser, x509_cert_t *cert) {
 
 	if (value < 0) {
 		return ERROR(
-		    ASININE_ERR_INVALID, "basic constraints: negative path length");
+			ASININE_ERR_INVALID, "basic constraints: negative path length");
 	}
 
 	if (value > 127) {
 		return ERROR(
-		    ASININE_ERR_UNSUPPORTED, "basic constraints: path length too high");
+			ASININE_ERR_UNSUPPORTED, "basic constraints: path length too high");
 	}
 
 	cert->path_len_constraint = (int8_t)value;
