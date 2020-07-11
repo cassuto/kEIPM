@@ -221,6 +221,13 @@ int rsa_verify(struct rsa_req *req)
 	if (sign < 0)
 		ret = -EBADMSG;
 
+	/* Recovery leading zeros that were deleted by MPI */
+    if (nbytes < req->dst_len) {
+        size_t remain = req->dst_len - nbytes;
+        memmove(req->dst + remain, req->dst, nbytes);
+        memset(req->dst, 0, remain);
+    }
+
 err_free_s:
 	mpi_free(s);
 err_free_m:

@@ -1,5 +1,5 @@
 CC ?= gcc
-TARGETS = ca.h
+TARGETS = ca.h client.h
 
 .PHONY: all clean
 all: bin2c $(TARGETS)
@@ -7,7 +7,7 @@ all: bin2c $(TARGETS)
 bin2c: bin2c.c
 	$(CC) $< -o $@
 
-%.h: %.crt bin2c
+%.h: %.der bin2c
 	./bin2c $(notdir $(basename $<)) $< $@
 
 clean:

@@ -6,7 +6,6 @@
 #include "watcher.h"
 #include "cert-validator.h"
 #include "data/ca.h"
-#include "sha.h"
 
 MODULE_AUTHOR ("cassuto <diyer175@hotmail.com>");
 MODULE_DESCRIPTION ("kernel ELF Integrity Protection Module");
@@ -14,18 +13,16 @@ MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0.0");
 
 struct cert g_cert;
-static struct sha256_state sha256_sst;
 
 static int __init keipm_init(void)
 {
-    int i;
     keipm_err_t err;
     printk(KERN_INFO KEIPM "%s\n", __func__);
     
-    err = watcher_init();
+    /*err = watcher_init();
     if (err.errno != kEIPM_OK) {
         return 1;
-    }
+    }*/
     cert_init(&g_cert);
 
     // Add root cert
@@ -40,7 +37,7 @@ static int __init keipm_init(void)
 static void __exit keipm_exit(void)
 {
     printk(KERN_INFO KEIPM "%s\n", __func__);
-    watcher_uninit();
+    /*watcher_uninit();*/
 }
 
 module_init(keipm_init);

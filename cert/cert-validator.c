@@ -7,6 +7,8 @@
 #include "asn1-parser/x509.h"
 #include "asn1-parser/internal/macros.h"
 #include "sha.h"
+#include "rsa.h"
+#include "pkcs1.h"
 
 #ifdef __KERNEL__
 #include <linux/time.h>
@@ -33,56 +35,65 @@ static void get_current_time(asn1_time_t *now) {
     now->second = (uint8_t)utc->tm_sec;
 }
 
-
 static keipm_err_t validate_rsa_signature(const x509_pubkey_t *pubkey, x509_pubkey_params_t params,
     const x509_signature_t *sig, const uint8_t *hash, size_t hash_len,
-    mbedtls_md_type_t digest)
+    const uint8_t *oid, size_t oid_len)
 {
-	(void)params;
-	(void)hash_len;
+    keipm_err_t res;
+    struct rsa_req rsa;
+    struct rsa_key raw_key;
+    unsigned int maxsize;
 
-	mbedtls_rsa_context rsa;
-	mbedtls_rsa_init(&rsa, MBEDTLS_RSA_PKCS_V15, MBEDTLS_MD_NONE);
-	rsa.len = pubkey->key.rsa.n_num;
+    (void)params;
 
-	keipm_err_t res;
-	if (mbedtls_mpi_read_binary(
-	        &rsa.N, pubkey->key.rsa.n, pubkey->key.rsa.n_num) != 0) {
-		res = ERROR(ASININE_ERR_MALFORMED, "rsa: invalid public modulus");
-		goto error;
-	}
+    raw_key.n = pubkey->key.rsa.n;
+    raw_key.n_sz = pubkey->key.rsa.n_num;
+    raw_key.e = pubkey->key.rsa.e;
+    raw_key.e_sz = pubkey->key.rsa.e_num;
+    if (rsa_set_pub_key(&rsa, &raw_key)) {
+        res = ERROR(ASININE_ERR_UNTRUSTED, "rsa: signature public key not valid");
+        goto error;
+    }
 
-	if (mbedtls_mpi_read_binary(
-	        &rsa.E, pubkey->key.rsa.e, pubkey->key.rsa.e_num) != 0) {
-		res = ERROR(ASININE_ERR_MALFORMED, "rsa: invalid exponent");
-		goto error;
-	}
+    /* Find out new modulus size from rsa implementation */
+    maxsize = rsa_max_size(&rsa);
+    if (maxsize > PAGE_SIZE) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: size of modulus is out of PAGE_SIZE");
+    }
 
-	if (mbedtls_rsa_check_pubkey(&rsa) != 0) {
-		res = ERROR(ASININE_ERR_INVALID, "rsa: public key check failed");
-		goto error;
-	}
+    rsa.src = sig->data;
+    rsa.src_len = sig->num;
+    rsa.dst_len = maxsize;
+    rsa.dst = kmalloc(rsa.dst_len, GFP_KERNEL);
+    if (rsa_verify(&rsa)) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: unexpected error");
+        goto error;
+    }
 
-	if (mbedtls_rsa_pkcs1_verify(&rsa, NULL, NULL, MBEDTLS_RSA_PUBLIC, digest,
-	        0, hash, sig->data) != 0) {
+	if (pkcs1_verify(rsa.dst, rsa.dst_len, oid, oid_len, hash, hash_len)) {
 		res = ERROR(ASININE_ERR_UNTRUSTED, "rsa: signature not valid");
 		goto error;
 	}
 
 	res = ERROR(ASININE_OK, NULL);
 error:
-	mbedtls_rsa_free(&rsa);
+    kfree(rsa.dst);
+	rsa_exit_req(&rsa);
 	return res;
 }
 
 static struct sha256_state sha256_sst;
-
+/*
+ * Note that this is not reenterable
+ */
 keipm_err_t validate_signature(const x509_pubkey_t *pubkey, x509_pubkey_params_t params,
     const x509_signature_t *sig, const uint8_t *raw, size_t raw_num,
     void *ctx)
 {
     uint8_t hash[64] = {0};
     size_t hash_len;
+    const unsigned char *oid = NULL;
+    size_t oid_size;
 
 	(void)ctx;
 
@@ -98,6 +109,8 @@ keipm_err_t validate_signature(const x509_pubkey_t *pubkey, x509_pubkey_params_t
         sha256_finalize(&sha256_sst, sha256_block);
         sha256_fill_digest(&sha256_sst, hash);
         hash_len = SHA256_DIGEST_SIZE;
+        oid = OID_DIGEST_ALG_SHA256;
+        oid_size = sizeof(OID_DIGEST_ALG_SHA256) - 1;
 		break;
     }
 	case X509_SIGNATURE_SHA384_RSA:
@@ -114,6 +127,10 @@ keipm_err_t validate_signature(const x509_pubkey_t *pubkey, x509_pubkey_params_t
 		return ERROR(kEIPM_ERR_DEPRECATED, "signature: uses MD2/MD5/SHA1");
 	}
 
+    if (!oid) {
+        return ERROR(kEIPM_ERR_INVALID, "signature: unknown algorithm");
+    }
+
 	switch (sig->algorithm) {
 	case X509_SIGNATURE_INVALID:
 		return ERROR(kEIPM_ERR_INVALID, "signature: invalid algorithm");
@@ -121,7 +138,7 @@ keipm_err_t validate_signature(const x509_pubkey_t *pubkey, x509_pubkey_params_t
 	case X509_SIGNATURE_SHA256_RSA:
 	case X509_SIGNATURE_SHA384_RSA:
 	case X509_SIGNATURE_SHA512_RSA:
-		return validate_rsa_signature(pubkey, params, sig, hash, hash_len, digest);
+		return validate_rsa_signature(pubkey, params, sig, hash, hash_len, oid, oid_size);
 	case X509_SIGNATURE_SHA256_ECDSA:
 	case X509_SIGNATURE_SHA384_ECDSA:
 	case X509_SIGNATURE_SHA512_ECDSA:
@@ -144,26 +161,25 @@ static keipm_err_t find_issuer(const uint8_t *buf, size_t length, const x509_cer
 
 static x509_cert_t issuer, cert;
 static x509_path_t path;
-static asn1_time_t now;
 static asn1_parser_t parser;
 /*
  * Note that this is not reenterable
  */
 static keipm_err_t validate_path(const uint8_t *trust, size_t trust_length,
-    const uint8_t *contents, size_t length)
+    const uint8_t *contents, size_t contents_length)
 {
     keipm_err_t err;
+    static asn1_time_t now;
 
     get_current_time(&now);
     
-    asn1_init(&parser, contents, length);
+    asn1_init(&parser, contents, contents_length);
 
     RETURN_ON_ERROR(x509_parse_cert(&parser, &cert));
-    
+
     if (trust != NULL) {
         err = find_issuer(trust, trust_length, &cert, &issuer);
         if (err.errno != kEIPM_OK) {
-            //dump_name(stderr, &cert.issuer);
             return err;
         }
     } else {
@@ -176,7 +192,6 @@ static keipm_err_t validate_path(const uint8_t *trust, size_t trust_length,
     while (!asn1_end(&parser)) {
         err = x509_path_add(&path, &cert);
         if (err.errno != kEIPM_OK) {
-            //dump_name(stderr, &cert.subject);
             return err;
         }
 
@@ -185,7 +200,6 @@ static keipm_err_t validate_path(const uint8_t *trust, size_t trust_length,
 
     err = x509_path_end(&path, &cert);
     if (err.errno != kEIPM_OK) {
-        //dump_name(stderr, &cert.subject);
         return err;
     }
 
@@ -218,7 +232,7 @@ keipm_err_t cert_validate(struct cert *cts, const uint8_t *content, size_t conte
     keipm_err_t error;
     size_t i;
     for(i=0;i<cts->n_cas;++i) {
-        error = validate_path(cts->cas[cts->n_cas].trust, cts->cas[cts->n_cas].trust_length,
+        error = validate_path(cts->cas[i].trust, cts->cas[i].trust_length,
             content, content_length);
         if (error.errno == kEIPM_OK) {
             return ERROR(kEIPM_OK, NULL);

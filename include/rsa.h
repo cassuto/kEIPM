@@ -12,7 +12,7 @@ struct rsa_mpi_key {
 };
 
 struct rsa_req {
-    u8 *src;
+    const u8 *src;
 	u8 *dst;
 	unsigned int src_len;
 	unsigned int dst_len;

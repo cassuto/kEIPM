@@ -8,6 +8,7 @@ $(MODNAME)-y	+= \
     utils/reader.o \
     crypto/sha256.o \
     crypto/rsa.o \
+    crypto/pkcs1.o \
     cert/asn1-oid.o \
     cert/asn1-parser.o \
     cert/asn1-types.o \
