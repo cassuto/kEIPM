@@ -3,30 +3,44 @@
 
 #ifdef __KERNEL__
 #include <linux/types.h>
+#include <linux/string.h>
 #else
 #include <stdint.h>
+#include <string.h>
 #endif
+
+#define ALIGN_TO(addr,size) (((addr)+(size)-1)&(~((size)-1)))
 
 /*
  * reader.c
  */
-typedef void * util_fp_t;
 #ifdef __KERNEL__
-typedef long long util_off_t;
+#include <linux/fs.h>
+typedef struct file * util_fp_t;
+typedef loff_t util_off_t;
 #else
-typedef long util_off_t;
+#include <stdio.h>
+typedef FILE * util_fp_t;
+typedef long int util_off_t;
 #endif
 
-extern util_fp_t util_open_rd(const char *filename);
-extern size_t util_read(util_fp_t fp, void *buf, size_t size, util_off_t *pos);
+extern ssize_t util_read(util_fp_t fp, void *buf, size_t size, util_off_t *pos);
+#ifndef __KERNEL__
+extern ssize_t util_write(util_fp_t fp, const void *buf, size_t size, util_off_t *pos);
+#endif
 
 #ifdef __KERNEL__
 # include <linux/slab.h>
 # define util_new(_s) kmalloc(_s, GFP_KERNEL)
 # define util_delete(_ptr) kfree(_ptr)
 #else
+# include <stdlib.h>
 # define util_new(_s) malloc(_s)
-# define util_delete(_ptr) free(_ptr)
+# define util_delete(_ptr) do { if(_ptr) free(_ptr); } while(0)
+#endif
+
+#ifndef MAX
+#define MAX(a, b) (((a) < (b)) ? b : a)
 #endif
 
 #endif // UTILS_H_

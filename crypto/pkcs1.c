@@ -32,6 +32,7 @@ int pkcs1_verify(const uint8_t *dec, size_t dec_lenght,
 		goto done;
 	pos++;
 
+	/* Validate ASN.1 header */
 	if (out_buf[pos] != (ASN1_SEQUENCE | ASN1_CONSTRUCTED))
 		goto done;
 	pos++;
@@ -66,6 +67,7 @@ int pkcs1_verify(const uint8_t *dec, size_t dec_lenght,
 		goto done;
 	pos++;
 
+	/* Validate digest data */
 	if (memcmp(out_buf + pos, digest, digest_length))
 		goto done;
 	pos += digest_length;

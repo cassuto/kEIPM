@@ -2,11 +2,10 @@
 #include <linux/uaccess.h>
 #include <linux/types.h>
 #include <linux/limits.h>
-#include <linux/fs.h>
 #include <linux/string.h>
-#include <linux/elf.h>
 #include <asm/page.h>
 #include "ksyms.h"
+#include "validator.h"
 #include "keipm.h"
 #include "watcher.h"
 
@@ -16,27 +15,6 @@ static uintptr_t *pp_elf_format_load_elf_binary, *pp_elf_format_load_elf_library
 static char pathname[PATH_MAX];
 
 typedef int (*pfn_load_elf_binary)(struct linux_binprm *bprm);
-
-static int analysis_binary(const char *pathname)
-{
-    char buf[EI_NIDENT];
-    loff_t pos = 0;
-    int retval;
-    struct file *file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
-    if (IS_ERR(file)) {
-        return 0;
-    }
-    retval = kernel_read(file, buf, sizeof(buf), &pos);
-	if (retval != sizeof(buf)) {
-        printk("kernel_read failed.\n");
-        return 0;
-	}
-    if (memcmp(buf, ELFMAG, SELFMAG) == 0) {
-        printk("Tracing ELF %s\n", pathname);
-    }
-    filp_close(file, NULL);
-    return 0;
-}
 
 /**
  * @brief Trying to copy pathname from the kernel

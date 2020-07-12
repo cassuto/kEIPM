@@ -6,9 +6,13 @@ IF(NOT CMAKE_BUILD_TYPE)
 ENDIF()
 
 set(SRCS
-	"${CMAKE_CURRENT_SOURCE_DIR}/elfop.c"
-    "${CMAKE_CURRENT_SOURCE_DIR}/elf-reader.c"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../utils/reader.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-op.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/sigtool.c"
+)
+
+include_directories(
+    "${CMAKE_CURRENT_SOURCE_DIR}/../include"
 )
 
 set(COMMON_WARNINGS					"-Wall")
