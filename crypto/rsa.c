@@ -325,6 +325,11 @@ unsigned int rsa_max_size(struct rsa_req *req)
 	return mpi_get_size(pkey->n);
 }
 
+void rsa_init_req(struct rsa_req *req)
+{
+	memset(req, 0, sizeof(*req));
+}
+
 void rsa_exit_req(struct rsa_req *req)
 {
 	struct rsa_mpi_key *pkey = rsa_get_key(req);

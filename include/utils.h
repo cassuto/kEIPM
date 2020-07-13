@@ -39,8 +39,12 @@ extern ssize_t util_write(util_fp_t fp, const void *buf, size_t size, util_off_t
 # define util_delete(_ptr) do { if(_ptr) free(_ptr); } while(0)
 #endif
 
+/* IMPORTANT! it is danger to pass non-variable arguments to MAX/MIN*/
 #ifndef MAX
 #define MAX(a, b) (((a) < (b)) ? b : a)
+#endif
+#ifndef MIN
+#define MIN(a, b) (((a) < (b)) ? a : b)
 #endif
 
 #endif // UTILS_H_

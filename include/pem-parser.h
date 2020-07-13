@@ -13,9 +13,10 @@ struct pem_key {
     size_t public_exponent_len;
     const uint8_t *private_exponent;
     size_t private_exponent_len;
+    int private_valid;
 };
 
-extern keipm_err_t pem_parse_private_key(struct pem_key *pem, const uint8_t *dat, size_t dat_len);
+extern  keipm_err_t pem_key_parse(struct pem_key *pem, bool private, const uint8_t *dat, size_t dat_len);
 extern void pem_exit(struct pem_key *pem);
 
 #endif // PEM_PARSER_H

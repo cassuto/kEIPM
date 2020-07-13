@@ -269,7 +269,7 @@ void sha256_init(struct sha256_state *sst)
 	sst->count = 0;
 }
 
-int sha256_update(struct sha256_state *sctx,
+void sha256_update(struct sha256_state *sctx,
 					const u8 *data,
 					unsigned int len,
 					sha256_block_fn *block_fn)
@@ -302,11 +302,9 @@ int sha256_update(struct sha256_state *sctx,
 	}
 	if (len)
 		memcpy(sctx->buf + partial, data, len);
-
-	return 0;
 }
 
-int sha256_finalize(struct sha256_state *sctx,
+void sha256_finalize(struct sha256_state *sctx,
 					  sha256_block_fn *block_fn)
 {
 	const int bit_offset = SHA256_BLOCK_SIZE - sizeof(__be64);
@@ -324,6 +322,4 @@ int sha256_finalize(struct sha256_state *sctx,
 	memset(sctx->buf + partial, 0x0, bit_offset - partial);
 	*bits = cpu_to_be64(sctx->count << 3);
 	block_fn(sctx, sctx->buf, 1);
-
-	return 0;
 }

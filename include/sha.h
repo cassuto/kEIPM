@@ -94,11 +94,11 @@ extern void sha256_init(struct sha256_state *sst);
 extern void sha256_block(struct sha256_state *sst, u8 const *src, int blocks);
 extern void sha256_fill_digest(struct sha256_state *sst, u8 dst[64]);
 
-extern int sha256_update(struct sha256_state *sctx,
+extern void sha256_update(struct sha256_state *sctx,
 					const u8 *data,
 					unsigned int len,
 					sha256_block_fn *block_fn);
-extern int sha256_finalize(struct sha256_state *sctx,
+extern void sha256_finalize(struct sha256_state *sctx,
 					  sha256_block_fn *block_fn);
 
 #endif // SHA_H_

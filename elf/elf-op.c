@@ -27,7 +27,7 @@ keipm_err_t elf_find_section(struct elf_parser *ep, const char *name, Elf64_Off 
     ssize_t len;
     Elf64_Sword i;
     struct elf64_shdr shstr, shcur;
-    char buf[ELFOP_SECTION_NAME_MAX];
+    char buf[ELFOP_SECTION_NAME_MAX]; /* >= strlen(SIG_ELF_SECTION_NAME) */
     util_off_t pos;
 
     pos = ep->hdr.e_shoff + ep->hdr.e_shstrndx*ep->hdr.e_shentsize;
@@ -60,6 +60,28 @@ keipm_err_t elf_find_section(struct elf_parser *ep, const char *name, Elf64_Off 
     }
 
     return ERROR(kEIPM_ERR_INVALID, "elf: section not found");
+}
+
+keipm_err_t elf_foreach_segment(struct elf_parser *ep, Elf64_Word target_type, pfn_on_segment callback, void *opaque)
+{
+    ssize_t len;
+    Elf64_Sword i;
+    struct elf64_phdr phdr;
+    util_off_t pos;
+
+    for(i=0;i<ep->hdr.e_phnum;++i) {
+        /* read out the program header */
+        pos = ep->hdr.e_phoff + i * ep->hdr.e_phentsize;
+        len = util_read(ep->fp, &phdr, sizeof(phdr), &pos);
+        if (len != sizeof(phdr)) {
+            return ERROR(kEIPM_ERR_MALFORMED, "elf: can not read file");
+        }
+
+        if (phdr.p_type == target_type) {
+            RETURN_ON_ERROR((*callback)(phdr.p_offset, phdr.p_filesz, opaque));
+        }
+    }
+    return ERROR(kEIPM_OK, NULL);
 }
 
 void elf_setfile(struct elf_parser *parser, util_fp_t fp)
@@ -115,12 +137,12 @@ static keipm_err_t copy_section(util_fp_t fp, size_t src_foff,size_t total, util
 {
     char chunk[512];
     size_t rlen, wlen;
-    size_t remain = total;
+    ssize_t remain = total;
     fseek(fp, src_foff, SEEK_SET);
     fseek(wfp, dst_foff, SEEK_SET);
-    for(;;) {
+    while(remain > 0) {
         rlen = fread(chunk, 1,sizeof(chunk), fp);
-        if (ferror(fp)) {
+        if (ferror(fp) || rlen == 0) {
             break;
         }
         wlen = fwrite(chunk, 1,rlen, wfp);
@@ -128,9 +150,6 @@ static keipm_err_t copy_section(util_fp_t fp, size_t src_foff,size_t total, util
             return ERROR(kEIPM_ERR_MALFORMED, "elf: can not write file");
         }
         remain -= rlen;
-        if (rlen < sizeof(chunk)) {
-            break;
-        }
     }
     return remain ==0 ? ERROR(kEIPM_OK, NULL) : ERROR(kEIPM_ERR_MALFORMED, "elf: can not read file");
 }

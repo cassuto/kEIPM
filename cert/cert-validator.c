@@ -46,6 +46,9 @@ static keipm_err_t validate_rsa_signature(const x509_pubkey_t *pubkey, x509_pubk
 
     (void)params;
 
+    rsa_init(&rsa);
+    rsa.dst = NULL;
+
     raw_key.n = pubkey->key.rsa.n;
     raw_key.n_sz = pubkey->key.rsa.n_num;
     raw_key.e = pubkey->key.rsa.e;
@@ -59,6 +62,7 @@ static keipm_err_t validate_rsa_signature(const x509_pubkey_t *pubkey, x509_pubk
     maxsize = rsa_max_size(&rsa);
     if (maxsize > PAGE_SIZE) {
         res = ERROR(kEIPM_ERR_MALFORMED, "rsa: size of modulus is out of PAGE_SIZE");
+        goto error;
     }
 
     rsa.src = sig->data;
@@ -162,10 +166,11 @@ static keipm_err_t find_issuer(const uint8_t *buf, size_t length, const x509_cer
 static x509_cert_t issuer, cert;
 static x509_path_t path;
 static asn1_parser_t parser;
-/*
+/**
+ * @brief Validate a cert
  * Note that this is not reenterable
  */
-static keipm_err_t validate_path(const uint8_t *trust, size_t trust_length,
+keipm_err_t cert_validate(const uint8_t *trust, size_t trust_length,
     const uint8_t *contents, size_t contents_length)
 {
     keipm_err_t err;
@@ -204,39 +209,4 @@ static keipm_err_t validate_path(const uint8_t *trust, size_t trust_length,
     }
 
     return ERROR(kEIPM_OK, NULL);
-}
-
-void cert_init(struct cert *cts) {
-    cts->n_cas = 0;
-}
-
-/**
- * @brief Add a root cert to the chain. 
- * Note that this would NOT copy the buffer of trust pointer.
- */
-keipm_err_t cert_add_ca(struct cert *cts, const uint8_t *trust, size_t trust_length) {
-    if (cts->n_cas +1 > MAX_CA) {
-        return ERROR(kEIPM_ERR_MEMORY, "cert: out of root CA number limit.");
-    }
-    cts->cas[cts->n_cas].trust = trust;
-    cts->cas[cts->n_cas].trust_length = trust_length;
-    ++cts->n_cas;
-    return ERROR(kEIPM_OK, NULL);
-}
-
-/**
- * @brief Validate a cert
- * Note that this is not reenterable
- */
-keipm_err_t cert_validate(struct cert *cts, const uint8_t *content, size_t content_length) {
-    keipm_err_t error;
-    size_t i;
-    for(i=0;i<cts->n_cas;++i) {
-        error = validate_path(cts->cas[i].trust, cts->cas[i].trust_length,
-            content, content_length);
-        if (error.errno == kEIPM_OK) {
-            return ERROR(kEIPM_OK, NULL);
-        }
-    }
-    return error;
 }

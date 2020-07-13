@@ -64,6 +64,7 @@ extern int rsa_verify(struct rsa_req *req);
 extern int rsa_set_pub_key(struct rsa_req *req, struct rsa_key *raw_key);
 extern int rsa_set_priv_key(struct rsa_req *req, struct rsa_key *raw_key);
 extern unsigned int rsa_max_size(struct rsa_req *req);
+extern void rsa_init_req(struct rsa_req *req);
 extern void rsa_exit_req(struct rsa_req *req);
 
 #endif // RSA_H_
