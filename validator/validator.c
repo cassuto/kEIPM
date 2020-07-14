@@ -16,23 +16,23 @@
 #define MAX_ENCDATA_BUFFER 1024*1024L
 
 typedef struct pubkey_info {
-    const char *        issuer;
+    char *              issuer;
     struct pem_key      key;
 } pubkey_info_t;
 typedef struct cert_info {
-    const char *        issuer;
+    char *              issuer;
     const uint8_t *     data;
     size_t              length;
 } cert_info_t;
 
 static struct validator {
-    uint8_t             edat[MAX_ENCDATA_BUFFER];
+    uint8_t             edat_buff[MAX_ENCDATA_BUFFER];
     uint8_t             hash[SHA256_DIGEST_SIZE];
     struct sha256_state sha_state;
     uint8_t             sha_filechunk[SHA256_BLOCK_SIZE];
     pubkey_info_t       pubkeys[MAX_N_PUBKEY];
     size_t              num_pubkey;
-    cert_info_t         certs[N_MAX_CA];
+    cert_info_t         certs[MAX_N_CA];
     size_t              num_cert;
 } vld;
 
@@ -49,13 +49,14 @@ static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opa
     remain = flen;
     pos = foffset;
     while(remain > 0) {
-        len = util_read(elfop->fp, vld.sha_filechunk, sizeof(vld.sha_filechunk), pos);
+        len = util_read(elfop->fp, vld.sha_filechunk, sizeof(vld.sha_filechunk), &pos);
         if (len <= 0) {
             break;
         }
         sha256_update(&vld.sha_state, vld.sha_filechunk, len, sha256_block);
         remain -= len;
     }
+    return ERROR(kEIPM_OK, NULL);
 }
 
 /**
@@ -65,8 +66,9 @@ static keipm_err_t hash_elf(struct elf_op *parser)
 {
     sha256_init(&vld.sha_state);
     RETURN_ON_ERROR(elf_foreach_segment(parser, PT_LOAD, on_elf_segment, parser));
-    sha256_finalize(&vld.sha_state);
+    sha256_finalize(&vld.sha_state, sha256_block);
     sha256_fill_digest(&vld.sha_state, vld.hash);
+    return ERROR(kEIPM_OK, NULL);
 };
 
 /**
@@ -80,7 +82,7 @@ static keipm_err_t vld_rsa_signature(const uint8_t *edat, size_t edat_len)
     unsigned int maxsize;
     size_t i;
 
-    rsa_init(&rsa);
+    rsa_init_req(&rsa);
 
     /*
      * Try foreach pubkeys
@@ -93,7 +95,7 @@ static keipm_err_t vld_rsa_signature(const uint8_t *edat, size_t edat_len)
         raw_key.e = vld.pubkeys[i].key.public_exponent;
         raw_key.e_sz = vld.pubkeys[i].key.public_exponent_len;
         if (rsa_set_pub_key(&rsa, &raw_key)) {
-            res = ERROR(ASININE_ERR_UNTRUSTED, "rsa: signature public key not valid");
+            res = ERROR(kEIPM_ERR_UNTRUSTED, "rsa: signature public key not valid");
             goto error;
         }
 
@@ -117,7 +119,7 @@ static keipm_err_t vld_rsa_signature(const uint8_t *edat, size_t edat_len)
             res = ERROR(kEIPM_OK, NULL);
             goto error;
         } else {
-            res = ERROR(kEIPM_ERR_INVALID, "signature not valid");
+            res = ERROR(kEIPM_ERR_UNTRUSTED, "signature not valid");
         }
 
     error:
@@ -133,7 +135,7 @@ static keipm_err_t vld_rsa_signature(const uint8_t *edat, size_t edat_len)
     return res;
 }
 
-static keipm_err_t validate_elf(struct elf_parser *parser)
+static keipm_err_t validate_elf(struct elf_op *parser)
 {
     keipm_err_t err;
     Elf64_Off sig_section_off;
@@ -144,11 +146,11 @@ static keipm_err_t validate_elf(struct elf_parser *parser)
     util_off_t pos;
     ssize_t len;
 
-    if (sig_section_size < sizeof(sig_hdr)) {
+    err = elf_find_section(parser, SIG_ELF_SECTION_NAME, SHT_PROGBITS, &sig_section_off, &sig_section_size);
+    if (err.errno != kEIPM_OK) {
         return ERROR(kEIPM_ERR_INVALID, "elf: no signature");
     }
-    err = elf_find_section(parser, SIG_ELF_SECTION_NAME, SHT_PROGBITS, &sig_section_off, &sig_section_size);
-    if (err != kEIPM_OK) {
+    if (sig_section_size < sizeof(sig_hdr)) {
         return ERROR(kEIPM_ERR_INVALID, "elf: no signature");
     }
 
@@ -180,18 +182,17 @@ static keipm_err_t validate_elf(struct elf_parser *parser)
         case SIG_HDR_TYPE_CERT:
             break;
         default:
-            /* Not a valid signature */
-            return -ENOEXEC;
+            return ERROR(kEIPM_ERR_INVALID, "elf: signature was broken");
     }
 
-    return 0;
+    return ERROR(kEIPM_OK, NULL);
 }
 
 int validator_analysis_binary(const char *pathname)
 {
     int retval;
     keipm_err_t err;
-    struct elf_parser ep;
+    struct elf_op ep;
     struct file *file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
     if (IS_ERR(file)) {
         return 0;
@@ -202,7 +203,9 @@ int validator_analysis_binary(const char *pathname)
         retval = 0;
         goto out;
     }
-    retval = validate_elf(&ep);
+    err = validate_elf(&ep);
+    printk("valid=%d %s\n", err.errno, err.reason);
+    retval = (err.errno == kEIPM_OK) ? 0 : -ENOEXEC;
 out:
     elf_exit(&ep);
     filp_close(file, NULL);
@@ -220,12 +223,12 @@ void validator_init(void) {
 keipm_err_t validator_add_pubkey(const char *issuer, const uint8_t *pubkey, size_t pubkey_len)
 {
     if (vld.num_pubkey + 1 > MAX_N_PUBKEY) {
-        return kEIPM_ERR_MEMORY, "the number of built-in pubkey is out of limit");
+        return ERROR(kEIPM_ERR_MEMORY, "the number of built-in pubkey is out of limit");
     }
     vld.pubkeys[vld.num_pubkey].issuer = util_new(strlen(issuer)+1);
     strcpy(vld.pubkeys[vld.num_pubkey].issuer, issuer);
 
-    RETURN_ON_ERROR(pem_key_parse(&vld.pubkeys[vld.num_pubkey].key, pubkey, pubkey_len));
+    RETURN_ON_ERROR(pem_key_parse(&vld.pubkeys[vld.num_pubkey].key, false, pubkey, pubkey_len));
 
     vld.num_pubkey++;
     return ERROR(kEIPM_OK, NULL);

@@ -5,7 +5,7 @@ $(MODNAME)-y	+= \
 	main.o \
 	watcher/watcher.o \
 	watcher/ksyms.o \
-    watcher/validator.o \
+    validator/validator.o \
     utils/reader.o \
     elf/elf-op.o \
     crypto/sha256.o \

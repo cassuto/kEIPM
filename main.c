@@ -6,7 +6,7 @@
 #include "watcher.h"
 #include "validator.h"
 #include "builtin/ca.h"
-#include "builtin/private_pkcs1.h"
+#include "builtin/public_pkcs1.h"
 
 MODULE_AUTHOR ("cassuto <diyer175@hotmail.com>");
 MODULE_DESCRIPTION ("kernel ELF Integrity Protection Module");
@@ -25,14 +25,14 @@ static int __init keipm_init(void)
 
     printk(KERN_INFO kEIPM "%s\n", __func__);
     
-    // FAIL_ON_ERROR(watcher_init());
+    FAIL_ON_ERROR(watcher_init());
 
     validator_init();
 
     // Add root cert
     FAIL_ON_ERROR(validator_add_root_cert("kEIPM", g_ca, g_cbca));
     // Set built-in private key
-    FAIL_ON_ERROR(validator_add_pubkey("kEIPM", g_private_pkcs1, g_cbprivate_pkcs1));
+    FAIL_ON_ERROR(validator_add_pubkey("kEIPM", g_public_pkcs1, g_cbpublic_pkcs1));
 
     return 0;
 }
@@ -40,7 +40,7 @@ static int __init keipm_init(void)
 static void __exit keipm_exit(void)
 {
     printk(KERN_INFO kEIPM "%s\n", __func__);
-    /*watcher_uninit();*/
+    watcher_uninit();
 }
 
 module_init(keipm_init);

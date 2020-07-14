@@ -46,7 +46,7 @@ static keipm_err_t validate_rsa_signature(const x509_pubkey_t *pubkey, x509_pubk
 
     (void)params;
 
-    rsa_init(&rsa);
+    rsa_init_req(&rsa);
     rsa.dst = NULL;
 
     raw_key.n = pubkey->key.rsa.n;

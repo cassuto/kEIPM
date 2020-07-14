@@ -66,7 +66,7 @@ keipm_err_t pem_key_parse(struct pem_key *pem, bool private, const uint8_t *dat,
         /* modulus INTEGER */
         RETURN_ON_ERROR(asn1_next(&parser));
         if (!asn1_is_int(token)) {
-            return ERROR(kEIPM_ERR_INVALID, "pem: invalid format");
+            return ERROR(kEIPM_ERR_INVALID, "pem: not a PKCS1 key");
         }
         pem->modulus = token->data;
         pem->modulus_len = token->length;
@@ -74,7 +74,7 @@ keipm_err_t pem_key_parse(struct pem_key *pem, bool private, const uint8_t *dat,
         /* publicExponent INTEGER */
         RETURN_ON_ERROR(asn1_next(&parser));
         if (!asn1_is_int(token)) {
-            return ERROR(kEIPM_ERR_INVALID, "pem: invalid format");
+            return ERROR(kEIPM_ERR_INVALID, "pem: not a PKCS1 key");
         }
         pem->public_exponent = token->data;
         pem->public_exponent_len = token->length;
@@ -82,13 +82,27 @@ keipm_err_t pem_key_parse(struct pem_key *pem, bool private, const uint8_t *dat,
         /* privateExponent INTEGER */
         RETURN_ON_ERROR(asn1_next(&parser));
         if (!asn1_is_int(token)) {
-            return ERROR(kEIPM_ERR_INVALID, "pem: invalid format");
+            return ERROR(kEIPM_ERR_INVALID, "pem: not a PKCS1 key");
         }
         pem->private_exponent = token->data;
         pem->private_exponent_len = token->length;
 
     } else { /* public key */
+        /* modulus INTEGER */
+        RETURN_ON_ERROR(asn1_next(&parser));
+        if (!asn1_is_int(token)) {
+            return ERROR(kEIPM_ERR_INVALID, "pem: not a PKCS1 key");
+        }
+        pem->modulus = token->data;
+        pem->modulus_len = token->length;
 
+        /* publicExponent INTEGER */
+        RETURN_ON_ERROR(asn1_next(&parser));
+        if (!asn1_is_int(token)) {
+            return ERROR(kEIPM_ERR_INVALID, "pem: not a PKCS1 key");
+        }
+        pem->public_exponent = token->data;
+        pem->public_exponent_len = token->length;
     }
 
     return ERROR(kEIPM_OK, NULL);

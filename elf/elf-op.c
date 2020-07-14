@@ -1,7 +1,7 @@
 #include "utils.h"
 #include "elf-op.h"
 
-keipm_err_t elf_parse(struct elf_parser *parser)
+keipm_err_t elf_parse(struct elf_op *parser)
 {
     ssize_t len;
     util_off_t pos;
@@ -22,7 +22,7 @@ keipm_err_t elf_parse(struct elf_parser *parser)
     return ERROR(kEIPM_OK, NULL);
 }
 
-keipm_err_t elf_find_section(struct elf_parser *ep, const char *name, Elf64_Off type, Elf64_Off *offset, Elf64_Xword *size)
+keipm_err_t elf_find_section(struct elf_op *ep, const char *name, Elf64_Off type, Elf64_Off *offset, Elf64_Xword *size)
 {
     ssize_t len;
     Elf64_Sword i;
@@ -62,7 +62,7 @@ keipm_err_t elf_find_section(struct elf_parser *ep, const char *name, Elf64_Off 
     return ERROR(kEIPM_ERR_INVALID, "elf: section not found");
 }
 
-keipm_err_t elf_foreach_segment(struct elf_parser *ep, Elf64_Word target_type, pfn_on_segment callback, void *opaque)
+keipm_err_t elf_foreach_segment(struct elf_op *ep, Elf64_Word target_type, pfn_on_segment callback, void *opaque)
 {
     ssize_t len;
     Elf64_Sword i;
@@ -84,12 +84,12 @@ keipm_err_t elf_foreach_segment(struct elf_parser *ep, Elf64_Word target_type, p
     return ERROR(kEIPM_OK, NULL);
 }
 
-void elf_setfile(struct elf_parser *parser, util_fp_t fp)
+void elf_setfile(struct elf_op *parser, util_fp_t fp)
 {
     parser->fp = fp;
 }
 
-void elf_exit(struct elf_parser *parser)
+void elf_exit(struct elf_op *parser)
 {
     parser->fp = NULL;
 }
@@ -111,7 +111,7 @@ static long filesize(util_fp_t fp)
     return size;
 }
 
-static keipm_err_t elf_read_shdr(struct elf_parser *ep)
+static keipm_err_t elf_read_shdr(struct elf_op *ep)
 {
     Elf64_Off i;
     ssize_t len;
@@ -154,7 +154,7 @@ static keipm_err_t copy_section(util_fp_t fp, size_t src_foff,size_t total, util
     return remain ==0 ? ERROR(kEIPM_OK, NULL) : ERROR(kEIPM_ERR_MALFORMED, "elf: can not read file");
 }
 
-keipm_err_t elf_write_signature_section(struct elf_parser *ep, util_fp_t wfp, const char *name, const void *sig, size_t sig_len)
+keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const char *name, const void *sig, size_t sig_len)
 {
     keipm_err_t res;
     ssize_t len;

@@ -1,5 +1,5 @@
 CC ?= gcc
-TARGETS = ca.h client.h private_pkcs1.h
+TARGETS = ca.h client.h public_pkcs1.h
 
 .PHONY: all clean
 all: bin2c $(TARGETS)
