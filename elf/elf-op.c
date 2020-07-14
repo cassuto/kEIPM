@@ -133,7 +133,7 @@ static keipm_err_t elf_read_shdr(struct elf_op *ep)
     return ERROR(kEIPM_OK, NULL);
 }
 
-static keipm_err_t copy_section(util_fp_t fp, size_t src_foff,size_t total, util_fp_t wfp, size_t dst_foff)
+keipm_err_t copy_section(util_fp_t fp, size_t src_foff,size_t total, util_fp_t wfp, size_t dst_foff)
 {
     char chunk[512];
     size_t rlen, wlen;
@@ -154,7 +154,7 @@ static keipm_err_t copy_section(util_fp_t fp, size_t src_foff,size_t total, util
     return remain ==0 ? ERROR(kEIPM_OK, NULL) : ERROR(kEIPM_ERR_MALFORMED, "elf: can not read file");
 }
 
-keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const char *name, const void *sig, size_t sig_len)
+keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const char *name, const void *sig, size_t sig_len, Elf64_Off *foff)
 {
     keipm_err_t res;
     ssize_t len;
@@ -315,6 +315,11 @@ keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const 
         goto out;
     }
     thdr.e_shnum++;
+
+    /* pass out the file offset for refilling data later */
+    if (foff) {
+        *foff = tshdr.sh_offset;
+    }
 
     /* write ELF header back */
     pos = 0;

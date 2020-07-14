@@ -10,6 +10,7 @@ set(SRCS
   "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-op.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-op.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/gen_rsa_key.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/sign_elf.c"
 	"${CMAKE_CURRENT_SOURCE_DIR}/sigtool.c"
 )
 

@@ -69,7 +69,7 @@ static keipm_err_t hash_elf(struct elf_op *parser)
     sha256_finalize(&vld.sha_state, sha256_block);
     sha256_fill_digest(&vld.sha_state, vld.hash);
     return ERROR(kEIPM_OK, NULL);
-};
+}
 
 /**
  * @brief Inner. Validate signature by means of RSA
@@ -105,7 +105,6 @@ static keipm_err_t vld_rsa_signature(const uint8_t *edat, size_t edat_len)
             res = ERROR(kEIPM_ERR_MALFORMED, "rsa: size of modulus is out of PAGE_SIZE");
             goto error;
         }
-
         rsa.src = edat;
         rsa.src_len = edat_len;
         rsa.dst_len = maxsize;
@@ -115,7 +114,8 @@ static keipm_err_t vld_rsa_signature(const uint8_t *edat, size_t edat_len)
             goto error;
         }
 
-        if ((rsa.dst_len == sizeof(vld.hash)) && (memcpy(rsa.dst, vld.hash, rsa.dst_len) == 0)) {
+        /* note that we merely take ZERO padding mode */
+        if ((rsa.dst_len >= sizeof(vld.hash)) && (memcmp(rsa.dst, vld.hash, sizeof(vld.hash)) == 0)) {
             res = ERROR(kEIPM_OK, NULL);
             goto error;
         } else {
@@ -168,7 +168,7 @@ static keipm_err_t validate_elf(struct elf_op *parser)
 
     /* read out encrypted digest from signature section */
     edat_pos = pos;
-    edat_size = MIN(sig_section_size-edat_pos-1, sizeof(vld.edat_buff));
+    edat_size = MIN(sig_section_size-sizeof(sig_hdr), sizeof(vld.edat_buff));
     len = util_read(parser->fp, vld.edat_buff, edat_size, &edat_pos);
     if (len <= 0) {
         return ERROR(kEIPM_ERR_INVALID, "elf: can't not read file");

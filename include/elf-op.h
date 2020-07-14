@@ -24,7 +24,8 @@ extern keipm_err_t elf_foreach_segment(struct elf_op *ep, Elf64_Word target_type
 extern void elf_exit(struct elf_op *parser);
 
 #ifndef __KERNEL__
-extern keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const char *name, const void *sig, size_t sig_len);
+extern keipm_err_t copy_section(util_fp_t fp, size_t src_foff,size_t total, util_fp_t wfp, size_t dst_foff);
+extern keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const char *name, const void *sig, size_t sig_len, Elf64_Off *foff);
 #endif // __KERNEL__
 
 #define ELFOP_SECTION_NAME_MAX 32

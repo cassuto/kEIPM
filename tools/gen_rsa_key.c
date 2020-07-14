@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <openssl/rsa.h>
 #include <openssl/pem.h>
+#include "signature.h"
 #include "api.h"
 
 #define BUG_CHECK "Internal error of libssl. Please check your OpenSSL library and then retry"
@@ -26,7 +27,7 @@ keipm_err_t gen_rsa_pri_key(const char *out_pri_key)
         goto out;
     }
 	rsa = RSA_new();
-	ret = RSA_generate_key_ex(rsa, 2048, bne, NULL);
+	ret = RSA_generate_key_ex(rsa, SIG_RSA_BITS, bne, NULL);
     if (ret != 1) {
         err = ERROR(kEIPM_ERR_MALFORMED, BUG_CHECK);
         goto out;
@@ -76,7 +77,7 @@ keipm_err_t gen_rsa_pub_key(const char *in_pri_key, const char *out_pub_key)
 {
     keipm_err_t err;
     int ret;
-    RSA *rsa = NULL; //RSA_new();
+    RSA *rsa = NULL;
     BIO *keybio = NULL;
     BIO *outbio = NULL;
 
