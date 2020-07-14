@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "errors.h"
+#include "api.h"
 #include "elf-op.h"
 
 int main(int argc, char *argv[])
@@ -9,11 +10,18 @@ int main(int argc, char *argv[])
     FILE *wfp;
     const char *secdata = "hello world";
     FILE *fp = fopen(argv[1],"rb+");
+
+    err = gen_rsa_pri_key("prikey.pem");
+    printf("%d\n", err.errno);
+    err = gen_rsa_pub_key("prikey.pem", "pubkey.pem");
+    printf("%d\n", err.errno);
+    return 0;
+
     if(!fp) {
         perror("fopen");
         return 1;
     }
-    struct elf_parser ep;
+    struct elf_op ep;
     elf_setfile(&ep, fp);
     err = elf_parse(&ep);
     if (err.errno != kEIPM_OK) {

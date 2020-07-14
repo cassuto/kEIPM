@@ -13,6 +13,7 @@ static uintptr_t p_load_elf_binary;
 static uintptr_t p_load_elf_library;
 static uintptr_t *pp_elf_format_load_elf_binary, *pp_elf_format_load_elf_library;
 static char pathname[PATH_MAX];
+static bool watcher_hooked = false;
 
 typedef int (*pfn_load_elf_binary)(struct linux_binprm *bprm);
 
@@ -55,15 +56,16 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
 
     for(i=0;i<sizeof(struct linux_binprm)/sizeof(uintptr_t);++i) {
         if(!copy_path_from_kernel(s[i], pathname)) {
-            if(strcmp(pathname, "/usr/bin/cat")) {
-                return 0;
-            }
-            if(validator_analysis_binary(pathname)) {
-                return -ENOEXEC;
+            printk("tracing %s\n", pathname);
+            if(strcmp(pathname, "/home/ain/tet")==0) {
+                if(validator_analysis_binary(pathname)) {
+                    return -ENOEXEC;
+                }
             }
         }
     }
 
+    /* normally load */
     return (*org)(bprm);
 }
 
@@ -71,7 +73,13 @@ keipm_err_t watcher_init(void)
 {
     int i=0;
     uintptr_t *pointers;
-    uintptr_t p_elf_format = (uintptr_t)find_kernel_entry("elf_format");
+    uintptr_t p_elf_format;
+    
+    if (watcher_hooked) {
+        return ERROR(kEIPM_OK, NULL);
+    }
+
+    p_elf_format = (uintptr_t)find_kernel_entry("elf_format");
     p_load_elf_binary = (uintptr_t)find_kernel_entry("load_elf_binary");
     p_load_elf_library = (uintptr_t)find_kernel_entry("load_elf_library");
     
@@ -96,11 +104,15 @@ keipm_err_t watcher_init(void)
         }
     }
 
+    watcher_hooked = true;
     return ERROR(kEIPM_OK, NULL);
 }
 
 void watcher_uninit(void)
 {
-    /* unhook load_elf_binary */
-    *pp_elf_format_load_elf_binary = p_load_elf_binary;
+    if (watcher_hooked) {
+        /* unhook load_elf_binary */
+        *pp_elf_format_load_elf_binary = p_load_elf_binary;
+        watcher_hooked = false;
+    }
 }

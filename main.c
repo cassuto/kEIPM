@@ -15,25 +15,23 @@ MODULE_VERSION("1.0.0");
 
 static int __init keipm_init(void)
 {
-#define FAIL_ON_ERROR(_x) do { \
+#define TRACE_ERROR(_x) do { \
     keipm_err_t _ret = (_x); \
     if(_ret.errno != kEIPM_OK) { \
         printk(KERN_ERR kEIPM "%s", _ret.reason); \
-        return 1; \
     } \
 }while(0)
 
     printk(KERN_INFO kEIPM "%s\n", __func__);
     
-    FAIL_ON_ERROR(watcher_init());
-
     validator_init();
 
     // Add root cert
-    FAIL_ON_ERROR(validator_add_root_cert("kEIPM", g_ca, g_cbca));
+    TRACE_ERROR(validator_add_root_cert("kEIPM", g_ca, g_cbca));
     // Set built-in private key
-    FAIL_ON_ERROR(validator_add_pubkey("kEIPM", g_public_pkcs1, g_cbpublic_pkcs1));
+    TRACE_ERROR(validator_add_pubkey("kEIPM", g_public_pkcs1, g_cbpublic_pkcs1));
 
+    TRACE_ERROR(watcher_init());
     return 0;
 }
 
