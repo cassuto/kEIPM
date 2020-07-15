@@ -17,6 +17,7 @@
 #include <linux/types.h>
 #include <linux/limits.h>
 #include <linux/string.h>
+#include <linux/list.h>
 #include <asm/page.h>
 #include "ksyms.h"
 #include "validator.h"
@@ -62,18 +63,32 @@ static int copy_path_from_kernel(uintptr_t ptr, char buf[PATH_MAX])
  */
 static int on_load_elf_binary(struct linux_binprm *bprm)
 {
+    size_t num_traced_pathname = 0;
+    const char *traced_file;
     pfn_load_elf_binary org = (pfn_load_elf_binary)p_load_elf_binary;
-
-    int i;
+    size_t i;
+    
     /* pointers in linux_binprm are aligned at 8 bytes boundary */
     uintptr_t *s = (uintptr_t *)bprm;
 
     for(i=0;i<sizeof(struct linux_binprm)/sizeof(uintptr_t);++i) {
         if(!copy_path_from_kernel(s[i], pathname)) {
-            if(strcmp(pathname, "/home/ain/test")==0) {
-                if(validator_analysis_binary(pathname)) {
-                    return -ENOEXEC;
+            /*
+             * Check whether this pathname has been already processed.
+             * This is because linux_binprm takes two fields to hold 
+             * the pathname of executables: 'filename' and 'interp'.
+             * Most of the time interp is same as filename, but could be different
+             * for binfmt_{misc,script}.
+             */
+            if (++num_traced_pathname > 1) {
+                if(strcmp(pathname,traced_file) == 0) {
+                    break;
                 }
+            }
+            traced_file = pathname;
+
+            if(validator_analysis_binary(pathname)) {
+                return -ENOEXEC;
             }
         }
     }
@@ -100,13 +115,10 @@ keipm_err_t watcher_init(void)
         return ERROR(kEIPM_ERR_UNSUPPORTED, "Unrecognized kernel version");
     }
 
-    printk("size=%lu\n", sizeof(struct linux_binfmt));
-
-    pointers  =(uintptr_t *)p_elf_format;
+    pointers = (uintptr_t *)p_elf_format;
     
     for(i=0;i<sizeof(struct linux_binfmt)/sizeof(uintptr_t);++i) {
         if (pointers[i] == p_load_elf_binary) {
-            printk("found %lx at offset %x!\n", p_load_elf_binary, i);
 
             /* hook load_elf_binary */
             pp_elf_format_load_elf_binary = &pointers[i];

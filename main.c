@@ -45,16 +45,14 @@ static int __init keipm_init(void)
     /* Set built-in private key */
     TRACE_ERROR(validator_add_pubkey("kEIPM", g_public_pkcs1, g_cbpublic_pkcs1));
 
-    validator_analysis_binary("/home/ain/test");
-
-    //TRACE_ERROR(watcher_init());
+    TRACE_ERROR(watcher_init());
     return 0;
 }
 
 static void __exit keipm_exit(void)
 {
     printk(KERN_INFO kEIPM "%s\n", __func__);
-    //watcher_uninit();
+    watcher_uninit();
 }
 
 module_init(keipm_init);

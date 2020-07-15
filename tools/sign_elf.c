@@ -32,6 +32,9 @@ struct hash_elf_params {
     uint8_t         sha_filechunk[SHA_FILE_CHUNK_SIZE];
 };
 
+static keipm_err_t copy_file(const char *src, const char *dst);
+static keipm_err_t check_prev_sig(const char *target_elf);
+
 /**
  * @brief Inner. Callback of elf_foreach_segment(). 
  * To hash each LOAD segment of the ELF
@@ -69,46 +72,6 @@ static keipm_err_t hash_elf(struct elf_op *parser, uint8_t digest[SHA256_DIGEST_
     return ERROR(kEIPM_OK, NULL);
 }
 
-/**
- * @brief Copy file indicated by src to dst
- * This don't care about file permissions
- */
-static keipm_err_t copy_file(const char *src, const char *dst)
-{
-    uint8_t cant_write = 0;
-    util_fp_t fp_src = NULL, fp_dst = NULL;
-    char chunk[512];
-    size_t rlen, wlen;
-
-    fp_src = fopen(src, "rb");
-    fp_dst = fopen(dst, "wb");
-    if (!fp_src || !fp_dst) {
-       cant_write = 1;
-       goto out;
-    }
-    
-    for(;;) {
-        rlen = fread(chunk, 1,sizeof(chunk), fp_src);
-        if (ferror(fp_src) || rlen == 0) {
-            break;
-        }
-        wlen = fwrite(chunk, 1,rlen, fp_dst);
-        if (wlen != rlen) {
-            cant_write = 1;
-            goto out;
-        }
-    }
-
-out:
-    if (fp_src) fclose(fp_src);
-    if (fp_dst) fclose(fp_dst);
-
-    if (cant_write) {
-        return ERROR(kEIPM_ERR_MALFORMED, "Can not write file. Please check your permission.");
-    }
-    return ERROR(kEIPM_OK, NULL);
-}
-
 static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *in_key)
 {
     keipm_err_t err;
@@ -134,6 +97,11 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
     size_t sig_section_size;
     Elf64_Off sig_section_foff;
 
+    err = check_prev_sig(target_elf);
+    if (err.errno != kEIPM_OK) {
+        goto out;
+    }
+
     /*
      * Create backup of the target file
      */
@@ -144,7 +112,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
     }
 
     /*
-     * Read the original ELF file
+     * Read out the original ELF file
      */
     fp_elf_rd = fopen(backup_pathname, "rb");
     if (!fp_elf_rd) {
@@ -301,6 +269,77 @@ out:
         free(sig_section_buff);
     elf_exit(&elfop);
     return err;
+}
+
+static keipm_err_t check_prev_sig(const char *target_elf)
+{
+    keipm_err_t err;
+    FILE *fp =NULL;
+    struct elf_op elfop;
+    Elf64_Off sec_offset;
+    Elf64_Xword sec_len;
+
+    fp = fopen(target_elf, "rb");
+    if (!fp) {
+        err = ERROR(kEIPM_ERR_MALFORMED, "Can not read ELF file. Please check your path and permission.");
+        goto out;
+    }
+    elf_setfile(&elfop, fp);
+    err = elf_parse(&elfop);
+    if (err.errno != kEIPM_OK) {
+        goto out;
+    }
+    err = elf_find_section(&elfop, SIG_ELF_SECTION_NAME ,SHT_PROGBITS, &sec_offset, &sec_len);
+    if (err.errno == kEIPM_OK) {
+        err = ERROR(kEIPM_ERR_INVALID, "The ELF file has already been signed. Please check.");
+        goto out;
+    }
+    err = ERROR(kEIPM_OK, NULL);
+out:
+    if (fp)
+        fclose(fp);
+    elf_exit(&elfop);
+    return err;
+}
+
+/**
+ * @brief Copy file indicated by src to dst
+ * This don't care about file permissions
+ */
+static keipm_err_t copy_file(const char *src, const char *dst)
+{
+    uint8_t cant_write = 0;
+    util_fp_t fp_src = NULL, fp_dst = NULL;
+    char chunk[512];
+    size_t rlen, wlen;
+
+    fp_src = fopen(src, "rb");
+    fp_dst = fopen(dst, "wb");
+    if (!fp_src || !fp_dst) {
+       cant_write = 1;
+       goto out;
+    }
+    
+    for(;;) {
+        rlen = fread(chunk, 1,sizeof(chunk), fp_src);
+        if (ferror(fp_src) || rlen == 0) {
+            break;
+        }
+        wlen = fwrite(chunk, 1,rlen, fp_dst);
+        if (wlen != rlen) {
+            cant_write = 1;
+            goto out;
+        }
+    }
+
+out:
+    if (fp_src) fclose(fp_src);
+    if (fp_dst) fclose(fp_dst);
+
+    if (cant_write) {
+        return ERROR(kEIPM_ERR_MALFORMED, "Can not write file. Please check your permission.");
+    }
+    return ERROR(kEIPM_OK, NULL);
 }
 
 keipm_err_t keipm_set_Key(const char* prikey_path,const char* elf_path)
