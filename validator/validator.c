@@ -282,15 +282,11 @@ static keipm_err_t validate_elf(struct elf_op *parser)
     return ERROR(kEIPM_OK, NULL);
 }
 
-int validator_analysis_binary(const char *pathname)
+int validator_analysis_binary(struct file *file)
 {
     int retval;
     keipm_err_t err;
     struct elf_op ep;
-    struct file *file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
-    if (IS_ERR(file)) {
-        return 0;
-    }
     elf_setfile(&ep, file);
     err = elf_parse(&ep);
     if (err.errno != kEIPM_OK) { /* If not a valid ELF file */
@@ -302,7 +298,6 @@ int validator_analysis_binary(const char *pathname)
     retval = (err.errno == kEIPM_OK) ? 0 : -ENOEXEC;
 out:
     elf_exit(&ep);
-    filp_close(file, NULL);
     return retval;
 }
 

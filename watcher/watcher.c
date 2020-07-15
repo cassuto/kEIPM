@@ -17,7 +17,7 @@
 #include <linux/types.h>
 #include <linux/limits.h>
 #include <linux/string.h>
-#include <linux/list.h>
+#include <linux/fs.h>
 #include <asm/page.h>
 #include "ksyms.h"
 #include "validator.h"
@@ -31,6 +31,7 @@ static char pathname[PATH_MAX];
 static bool watcher_hooked = false;
 
 typedef int (*pfn_load_elf_binary)(struct linux_binprm *bprm);
+typedef int (*pfn_load_elf_library)(struct file *file);
 
 /**
  * @brief Trying to copy pathname from the kernel
@@ -59,7 +60,7 @@ static int copy_path_from_kernel(uintptr_t ptr, char buf[PATH_MAX])
 }
 
 /**
- * @brief Called when kernel start to call load_elf_binary
+ * @brief Hooker handler of kernel load_elf_binary()
  */
 static int on_load_elf_binary(struct linux_binprm *bprm)
 {
@@ -67,7 +68,8 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
     const char *traced_file;
     pfn_load_elf_binary org = (pfn_load_elf_binary)p_load_elf_binary;
     size_t i;
-    
+    struct file *file;
+
     /* pointers in linux_binprm are aligned at 8 bytes boundary */
     uintptr_t *s = (uintptr_t *)bprm;
 
@@ -86,15 +88,37 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
                 }
             }
             traced_file = pathname;
-
-            if(validator_analysis_binary(pathname)) {
+            /*
+             * Parse the traced file
+             * that file indicated by pathname may be not an ELF.
+             */
+            file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
+            if (IS_ERR(file)) {
+                return 0;
+            }
+            if(validator_analysis_binary(file)) {
+                filp_close(file, NULL);
                 return -ENOEXEC;
             }
+            filp_close(file, NULL);
         }
     }
 
     /* normally load */
     return (*org)(bprm);
+}
+
+/**
+ * @brief Hooker handler of kernel load_elf_library()
+ */
+static int on_load_elf_library(struct file *file)
+{
+    pfn_load_elf_library org = (pfn_load_elf_library)p_load_elf_library;
+    if(validator_analysis_binary(file)) {
+        return -ENOEXEC;
+    }
+    /* normally load */
+    return (*org)(file);
 }
 
 keipm_err_t watcher_init(void)
@@ -120,12 +144,15 @@ keipm_err_t watcher_init(void)
     for(i=0;i<sizeof(struct linux_binfmt)/sizeof(uintptr_t);++i) {
         if (pointers[i] == p_load_elf_binary) {
 
-            /* hook load_elf_binary */
+            /* hook load_elf_binary() */
             pp_elf_format_load_elf_binary = &pointers[i];
             pointers[i] = (uintptr_t)on_load_elf_binary;
         }
         if (pointers[i] == p_load_elf_library) {
-            printk("found %lx at offset %x!\n", p_load_elf_library, i);
+            
+            /* hook load_elf_library() */
+            pp_elf_format_load_elf_library = &pointers[i];
+            pointers[i] = (uintptr_t)on_load_elf_library;
         }
     }
 
@@ -138,6 +165,7 @@ void watcher_uninit(void)
     if (watcher_hooked) {
         /* unhook load_elf_binary */
         *pp_elf_format_load_elf_binary = p_load_elf_binary;
+        *pp_elf_format_load_elf_library = p_load_elf_library;
         watcher_hooked = false;
     }
 }
