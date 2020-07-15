@@ -22,14 +22,14 @@
 
 #include "api.h"
 
-#define SHA_CHUNK_SIZE 1024
+#define SHA_FILE_CHUNK_SIZE 32
 
 struct hash_elf_params {
     /** ELF parser & writer */
     struct elf_op * elfop;
     /** SHA context state */
     SHA256_CTX      sha;
-    uint8_t         sha_filechunk[/*SHA_CHUNK_SIZE*/64];
+    uint8_t         sha_filechunk[SHA_FILE_CHUNK_SIZE];
 };
 
 /**
@@ -45,11 +45,12 @@ static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opa
     remain = flen;
     pos = foffset;
     while(remain > 0) {
-        len = util_read(params->elfop->fp, params->sha_filechunk, sizeof(params->sha_filechunk), &pos);
+        //len = util_read(params->elfop->fp, params->sha_filechunk, sizeof(params->sha_filechunk), &pos);
         if (len <= 0) {
             break;
         }
-        SHA256_Update(&params->sha, params->sha_filechunk, len);
+        printf("%d\n", len);
+        //SHA256_Update(&params->sha, params->sha_filechunk, len);
         remain -= len;
     }
     return ERROR(kEIPM_OK, NULL);
@@ -63,7 +64,7 @@ static keipm_err_t hash_elf(struct elf_op *parser, uint8_t digest[SHA256_DIGEST_
     struct hash_elf_params params;
     params.elfop = parser;
     SHA256_Init(&params.sha);
-    RETURN_ON_ERROR(elf_foreach_segment(parser, PT_LOAD, on_elf_segment, &params));
+    //RETURN_ON_ERROR(elf_foreach_segment(parser, PT_LOAD, on_elf_segment, &params));
     SHA256_Final(digest, &params.sha);
     return ERROR(kEIPM_OK, NULL);
 }
@@ -126,6 +127,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
     util_fp_t fp_elf_wb = NULL;
     util_off_t pos;
     ssize_t len;
+    uint8_t *rsa_in = NULL;
     uint8_t sig_hdr[2];
     size_t sig_hdr_ext_size;
     uint8_t *sig_section_buff = NULL;
@@ -227,14 +229,29 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
         goto out;
     }
 
+    int i;
+    for(i=0;i<sizeof(elf_digest);i++){
+        printf("%x ", elf_digest[i]);
+    }
+
+    elf_digest[0] = 0;
+    elf_digest[1] = 0;
+
     /*
      * Compute RSA signature of digest now
      */
-    memset(elf_sign, 0, elf_sign_size);
-    ret = RSA_private_encrypt(elf_sign_size,
-                                elf_digest,
+    rsa_in = (uint8_t *)malloc(elf_sign_size);
+    memset(rsa_in, 0, elf_sign_size);
+    memcpy(rsa_in, elf_digest, sizeof(elf_digest));
+    ret = RSA_private_encrypt(sizeof(elf_digest), rsa_in,
                                 elf_sign, rsa, RSA_NO_PADDING);
     if (ret != elf_sign_size) {
+        const char *fn;
+        int line;
+        ERR_get_error_line(&fn, &line);
+        printf("\nerr=%d\n", ERR_get_error());
+        printf("%d %s\n", line, fn);
+        
         err = ERROR(kEIPM_ERR_MALFORMED, "failed on RSA encrypt");
         goto out;
     }
@@ -282,6 +299,8 @@ out:
         BIO_free(keybio);
     if (rsa)
         RSA_free(rsa);
+    if (rsa_in)
+        free(rsa_in);
     if (fp_cert)
         fclose(fp_cert);
     if (fp_elf_rd)

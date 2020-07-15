@@ -33,6 +33,8 @@
 #define MAX_CERT_BUFFER 65536
 /** Define max size of signature data in bytes */
 #define MAX_ENC_DIGEST_BUFFER 65536
+/** Define size of file chunk for SHA */
+#define SHA_FILE_CHUNK_SIZE 8192
 
 typedef struct pubkey_info {
     char *              issuer;
@@ -49,7 +51,7 @@ static struct validator {
     uint8_t             edigest_buff[MAX_ENC_DIGEST_BUFFER];
     uint8_t             hash[SHA256_DIGEST_SIZE];
     struct sha256_state sha_state;
-    uint8_t             sha_filechunk[SHA256_BLOCK_SIZE];
+    uint8_t             sha_filechunk[SHA_FILE_CHUNK_SIZE];
     pubkey_info_t       pubkeys[MAX_N_PUBKEY];
     size_t              num_pubkey;
     cert_info_t         certs[MAX_N_CA];
@@ -73,6 +75,7 @@ static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opa
         if (len <= 0) {
             break;
         }
+        printk("%d", len);
         sha256_update(&vld.sha_state, vld.sha_filechunk, len, sha256_block);
         remain -= len;
     }
@@ -194,7 +197,7 @@ static keipm_err_t verify_cert_signature(const uint8_t *cert_data, size_t cert_l
             );
         }
     }
-    return ERROR(kEIPM_ERR_INVALID, "elf: signature is invalid");
+    return ERROR(kEIPM_ERR_INVALID, "elf: certificate is invalid");
 }
 
 static keipm_err_t validate_elf(struct elf_op *parser)
@@ -255,14 +258,14 @@ static keipm_err_t validate_elf(struct elf_op *parser)
         }
     }
 
-    RETURN_ON_ERROR(hash_elf(parser));
-
     /* read out encrypted digest from signature section */
     edigest_size = MIN(sig_section_size-sig_hdr_size, sizeof(vld.edigest_buff));
     len = util_read(parser->fp, vld.edigest_buff, edigest_size, &pos);
     if (len != edigest_size) {
         return ERROR(kEIPM_ERR_INVALID, "elf: can't not read file");
     }
+
+    RETURN_ON_ERROR(hash_elf(parser));
 
     switch (sig_hdr[1]) {
         case SIG_HDR_TYPE_RSA_KEY: {
