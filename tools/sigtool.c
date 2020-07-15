@@ -22,10 +22,11 @@ int main(int argc, char *argv[])
 {
     keipm_err_t err;
 
-    extern void dump_hash(const char *target_elf);
-
-    err = keipm_set_UserCA("./user.der", "/home/ain/test");
+    err = keipm_set_Key("/home/ain/EIPM/builtin/private_pkcs1.pem", "/home/ain/test");
     printf("%s\n",err.reason ? err.reason : "OK");
+    
+    //err = keipm_set_UserCA("./user.der", "/home/ain/test");
+    //printf("%s\n",err.reason ? err.reason : "OK");
 
 #if 0
     RootCa ca;
@@ -43,10 +44,11 @@ int main(int argc, char *argv[])
     ua.User_Org_name = "org";
     ua.User_State = "state";
     ua.days = 30;
+    ua.User_input_RootCA_Path = "./ca.der";
 
     err = keipm_create_rootCA("./ca.der", &ca);
     printf("%s\n",err.reason ? err.reason : "OK");
-    err = keipm_create_userCA("./user.der", "./ca.der.key", &ua);
+    err = keipm_create_userCA("./user.der", &ua);
     printf("%s\n",err.reason ? err.reason : "OK");
 #endif
     return 0;

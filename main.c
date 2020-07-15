@@ -41,9 +41,9 @@ static int __init keipm_init(void)
     validator_init();
 
     /* Add root cert */
-    TRACE_ERROR(validator_add_root_cert("kEIPM", g_ca, g_cbca));
-    /* Set built-in private key */
-    TRACE_ERROR(validator_add_pubkey("kEIPM", g_public_pkcs1, g_cbpublic_pkcs1));
+    TRACE_ERROR(validator_add_root_cert("builtin/ca.der", g_ca, g_cbca));
+    /* Add built-in public key */
+    TRACE_ERROR(validator_add_pubkey("builtin/public_pkcs1.pem", g_public_pkcs1, g_cbpublic_pkcs1));
 
     TRACE_ERROR(watcher_init());
     return 0;

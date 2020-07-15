@@ -237,7 +237,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
         /* Write RSA signature */
         memcpy(buf_ptr+cert_size, elf_sign, elf_sign_size);
     }
-
+    
     /*
      * Write back signature to target ELF
      */

@@ -5,14 +5,17 @@ IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE Release)
 ENDIF()
 
-set(SRCS
-	"${CMAKE_CURRENT_SOURCE_DIR}/../utils/fs.c"
+set(SRCS_LIB
+  "${CMAKE_CURRENT_SOURCE_DIR}/../utils/fs.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-parser.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-writer.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/gen_rsa_key.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/gen_cert.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/sign_elf.c"
-	"${CMAKE_CURRENT_SOURCE_DIR}/sigtool.c"
+)
+
+set(SRCS_TOOL
+  "${CMAKE_CURRENT_SOURCE_DIR}/sigtool.c"
 )
 
 #
@@ -56,8 +59,11 @@ set(CMAKE_C_FLAGS_DEBUG           "-g ${COMMON_WARNINGS}")
 set(CMAKE_C_FLAGS_RELEASE         "-O2 ${COMMON_WARNINGS}")
 set(CMAKE_C_FLAGS_PROFILE         "-O2 -pg ${COMMON_WARNINGS}")
 
-add_executable(${PROJECT_NAME} ${SRCS})
+ADD_LIBRARY(sigelf ${SRCS_LIB})
+
+add_executable(${PROJECT_NAME} ${SRCS_TOOL})
 target_link_libraries(${PROJECT_NAME}
+  sigelf
   ${SSL_LIBRARY}
   ${CRYPTO_LIBRARY}
 )

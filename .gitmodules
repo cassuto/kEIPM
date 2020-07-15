@@ -1,0 +1,3 @@
+[submodule "tools/frontend"]
+	path = tools/frontend
+	url = https://github.com/cassuto/kEIPM_GUI.git

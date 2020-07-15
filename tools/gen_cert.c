@@ -134,7 +134,10 @@ static keipm_err_t make_cert(const char *out_pathname,
 	X509_gmtime_adj(X509_get_notAfter(x),(long)60*60*24*days);
 	X509_set_pubkey(x,pk);
 
-	name = X509_get_subject_name(x);
+    name = X509_get_subject_name(x);
+    if (!gen_root) {
+	    
+    }
 
 	/* This function creates and adds the entry, working out the
 	 * correct string type and performing checks on its length.
@@ -247,7 +250,7 @@ out:
     return err;
 }
 
-keipm_err_t keipm_create_userCA(const char *out_cert_path, const char *ca_key_path, const UserCa *userca)
+keipm_err_t keipm_create_userCA(const char *out_cert_path, const UserCa *userca)
 {
     keipm_err_t err;
     int ret;
@@ -259,7 +262,7 @@ keipm_err_t keipm_create_userCA(const char *out_cert_path, const char *ca_key_pa
     /*
      * Load CA private key for signing user cert
      */
-    keybio = BIO_new_file(ca_key_path, "r");
+    keybio = BIO_new_file(userca->User_input_RootCA_Path, "r");
     if (!keybio) {
         err = ERROR(kEIPM_ERR_MALFORMED, "Can not read private key file. Please check your path and permission.");
         goto out;
@@ -267,7 +270,7 @@ keipm_err_t keipm_create_userCA(const char *out_cert_path, const char *ca_key_pa
 
     CA_key = PEM_read_bio_RSAPrivateKey(keybio, &CA_key, NULL, NULL); 
     if (!CA_key) {
-        err = ERROR(kEIPM_ERR_MALFORMED, "can not load private key file");
+        err = ERROR(kEIPM_ERR_MALFORMED, "can not load private key file. Please check your path and permission.");
         goto out;
     }
 

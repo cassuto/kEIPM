@@ -70,7 +70,7 @@ extern keipm_err_t keipm_create_rootCA(const char *rootCA_Path, const RootCa *ro
  * @param [in] rootca 用户证书信息结构体
  * @return [out] error 错误结构体
 */
-extern keipm_err_t keipm_create_userCA(const char *out_cert_path, const char *ca_key_path, const UserCa *userca);
+extern keipm_err_t keipm_create_userCA(const char *out_cert_path, const UserCa *userca);
 
 
 #ifdef __cplusplus
