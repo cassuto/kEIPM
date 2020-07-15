@@ -94,7 +94,7 @@ out:
     return ERROR(kEIPM_OK, NULL);
 }
 
-static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *in_pri_key)
+static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *in_key)
 {
     keipm_err_t err;
     int ret;
@@ -141,7 +141,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
         /*
         * Load private key
         */
-        keybio = BIO_new_file(in_pri_key, "r");
+        keybio = BIO_new_file(in_key, "r");
         if (!keybio) {
             err = ERROR(kEIPM_ERR_MALFORMED, "can not read private key file");
             goto out;
@@ -156,7 +156,10 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
         elf_sign_size = SIG_RSA_BITS / 8;
         sig_section_size = sizeof(sig_hdr) + elf_sign_size;
     } else {
-
+        /*
+         * Load certificate
+         */
+        
     }
 
     elf_sign = (uint8_t *)malloc(elf_sign_size);

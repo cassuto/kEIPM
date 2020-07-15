@@ -64,7 +64,8 @@ static int add_ext(X509 *cert, int nid, char *value)
  * Hash: SHA256
  */
 static keipm_err_t make_cert(const char *out_pathname,
-    RSA **private_key,
+    RSA **ca_key, /* when ca_key==public_key we suppose we're making CA*/
+    RSA **public_key,
     const char *field_C,
     const char *field_S,
     const char *field_L,
@@ -75,24 +76,43 @@ static keipm_err_t make_cert(const char *out_pathname,
     keipm_err_t err;
     int ret;
 	X509 *x = NULL;
-	EVP_PKEY *pk = NULL;
+	EVP_PKEY *pk = NULL, *pk_priv = NULL;
 	X509_NAME *name=NULL;
     BIO *bio=NULL;
+    uint8_t gen_root = 1;
 	
-    if ((pk=EVP_PKEY_new()) == NULL) {
-        err = ERROR(kEIPM_ERR_MEMORY, "out of memory");
-        goto out;
+    if (*ca_key == *public_key) {
+        gen_root = 1;
+        if ((pk=EVP_PKEY_new()) == NULL) {
+            err = ERROR(kEIPM_ERR_MEMORY, "out of memory");
+            goto out;
+        }
+        if (!EVP_PKEY_assign_RSA(pk,*ca_key)) {
+            err = ERROR(kEIPM_ERR_MEMORY, "Can not load RSA key." BUG_CHECK);
+            goto out;
+        }
+        *ca_key = NULL;
+    } else {
+        gen_root = 0;
+        if (((pk=EVP_PKEY_new()) == NULL) || ((pk_priv=EVP_PKEY_new()) == NULL)) {
+            err = ERROR(kEIPM_ERR_MEMORY, "out of memory");
+            goto out;
+        }
+        if (!EVP_PKEY_assign_RSA(pk_priv,*ca_key)) {
+            err = ERROR(kEIPM_ERR_MEMORY, "Can not load RSA key." BUG_CHECK);
+            goto out;
+        }
+        *ca_key = NULL;
+        if (!EVP_PKEY_assign_RSA(pk,*public_key)) {
+            err = ERROR(kEIPM_ERR_MEMORY, "Can not load RSA key." BUG_CHECK);
+            goto out;
+        }
+        *public_key = NULL;
     }
     if ((x=X509_new()) == NULL) {
         err = ERROR(kEIPM_ERR_MEMORY, "out of memory");
         goto out;
     }
-
-	if (!EVP_PKEY_assign_RSA(pk,*private_key)) {
-		err = ERROR(kEIPM_ERR_MEMORY, "Can not generate RSA key." BUG_CHECK);
-        goto out;
-	}
-    *private_key = NULL;
 
 	X509_set_version(x,2);
 	ASN1_INTEGER_set(X509_get_serialNumber(x), /* SERIAL */ 1);
@@ -133,7 +153,7 @@ static keipm_err_t make_cert(const char *out_pathname,
 
 	add_ext(x, NID_netscape_comment, "none");
 
-	if (!X509_sign(x, pk, EVP_sha256())) {
+	if (!X509_sign(x, gen_root ? pk : pk_priv, EVP_sha256())) {
         err = ERROR(kEIPM_ERR_MEMORY, "Can not sign cert." BUG_CHECK);
 		goto out;
     }
@@ -155,6 +175,9 @@ out:
     if (pk) {
         EVP_PKEY_free(pk);
     }
+    if (pk_priv) {
+        EVP_PKEY_free(pk_priv);
+    }
     if (x) {
         X509_free(x);
     }
@@ -175,6 +198,9 @@ keipm_err_t keipm_create_rootCA(const char *rootCA_Path, const RootCa *rootca)
         return ERROR(kEIPM_ERR_MEMORY, "Can not generate RSA key pair." BUG_CHECK);
     }
 
+    /*
+     * Save CA private key
+     */
     snprintf(private_key_pathname, sizeof(private_key_pathname), "%s.key", rootCA_Path);
     keybio = BIO_new_file(private_key_pathname, "w");
     if (!keybio) {
@@ -189,6 +215,7 @@ keipm_err_t keipm_create_rootCA(const char *rootCA_Path, const RootCa *rootca)
     }
 
     err = make_cert(rootCA_Path,
+        &private_key,
         &private_key,
         rootca->Root_Country,
         rootca->Root_State,
@@ -209,23 +236,51 @@ out:
 keipm_err_t keipm_create_userCA(const char *out_cert_path, const char *ca_key_path, const UserCa *userca)
 {
     keipm_err_t err;
-    RSA *private_key = NULL;
-    BIO *keybio = NULL;
+    int ret;
+    char private_key_pathname[PATH_MAX];
+    RSA *CA_key = NULL;
+    RSA *public_key = NULL;
+    BIO *keybio = NULL, *outbio = NULL;
 
+    /*
+     * Load CA private key for signing user cert
+     */
     keybio = BIO_new_file(ca_key_path, "r");
     if (!keybio) {
         err = ERROR(kEIPM_ERR_MALFORMED, "Can not read private key file. Please check your path and permission.");
         goto out;
     }
 
-    private_key = PEM_read_bio_RSAPrivateKey(keybio, &private_key, NULL, NULL); 
-    if (!private_key) {
+    CA_key = PEM_read_bio_RSAPrivateKey(keybio, &CA_key, NULL, NULL); 
+    if (!CA_key) {
+        err = ERROR(kEIPM_ERR_MALFORMED, "can not load private key file");
+        goto out;
+    }
+
+    /*
+     * Generate user private key
+     */
+    public_key = gen_key_pair();
+    if (!public_key) {
+        err = ERROR(kEIPM_ERR_MALFORMED, "can not generate private key." BUG_CHECK);
+    }
+
+    snprintf(private_key_pathname, sizeof(private_key_pathname), "%s.key", out_cert_path);
+    outbio = BIO_new_file(private_key_pathname, "w");
+    if (!outbio) {
+        err = ERROR(kEIPM_ERR_MALFORMED, "Can not write private key file. Please check your path and permission.");
+        goto out;
+    }
+
+    ret = PEM_write_bio_RSAPrivateKey(outbio, public_key, NULL, NULL, 0, NULL, NULL); 
+    if (ret != 1) {
         err = ERROR(kEIPM_ERR_MALFORMED, "can not load private key file");
         goto out;
     }
 
     err = make_cert(out_cert_path,
-        &private_key,
+        &CA_key,
+        &public_key,
         userca->User_Country,
         userca->User_State,
         userca->User_Local,
@@ -236,8 +291,14 @@ out:
     if (keybio) {
         BIO_free(keybio);
     }
-    if (private_key) {
-        RSA_free(private_key);
+    if (outbio) {
+        BIO_free(outbio);
+    }
+    if (CA_key) {
+        RSA_free(CA_key);
+    }
+    if (public_key) {
+        RSA_free(public_key);
     }
     return err;
 }
