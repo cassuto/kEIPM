@@ -10,4 +10,7 @@
 #define SIG_HDR_TYPE_RSA_KEY  0x0
 #define SIG_HDR_TYPE_CERT     0x1
 
+/** Sizeof certificate length field in sig header */
+#define SIZEOF_SIG_HDR_CERT_LEN 2
+
 #endif // SIGNATURE_H_

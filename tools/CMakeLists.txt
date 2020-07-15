@@ -6,9 +6,9 @@ IF(NOT CMAKE_BUILD_TYPE)
 ENDIF()
 
 set(SRCS
-	"${CMAKE_CURRENT_SOURCE_DIR}/../utils/reader.c"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-op.c"
-  "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-op.c"
+	"${CMAKE_CURRENT_SOURCE_DIR}/../utils/fs.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-parser.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/../elf/elf-writer.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/gen_rsa_key.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/gen_cert.c"
   "${CMAKE_CURRENT_SOURCE_DIR}/sign_elf.c"

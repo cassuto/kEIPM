@@ -12,38 +12,41 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU      
  *  Lesser General Public License for more details.                        
  */
+#include "utils.h"
+#ifdef __KERNEL__
+#include <linux/fs.h>
+#else
 #include <stdio.h>
-#include <string.h>
-#include "errors.h"
-#include "api.h"
-#include "elf-op.h"
-
-int main(int argc, char *argv[])
-{
-    keipm_err_t err;
-    err = keipm_set_UserCA("./user.der", "/home/ain/test");
-    printf("%s\n",err.reason ? err.reason : "OK");
-#if 0
-    RootCa ca;
-    ca.Root_Country = "c";
-    ca.Root_Common_name = "cn";
-    ca.Root_Local = "L";
-    ca.Root_Org_name = "org";
-    ca.Root_State = "state";
-    ca.days = 30;
-
-    UserCa ua;
-    ua.User_Country = "c";
-    ua.User_Common_name = "cn";
-    ua.User_Local = "L";
-    ua.User_Org_name = "org";
-    ua.User_State = "state";
-    ua.days = 30;
-
-    err = keipm_create_rootCA("./ca.der", &ca);
-    printf("%s\n",err.reason ? err.reason : "OK");
-    err = keipm_create_userCA("./user.der", "./ca.der.key", &ua);
-    printf("%s\n",err.reason ? err.reason : "OK");
 #endif
-    return 0;
+
+ssize_t util_read(util_fp_t fp, void *buf, size_t size, util_off_t *pos)
+{
+#ifdef __KERNEL__
+    return kernel_read(fp, buf, size, pos);
+#else
+    fseek(fp, *pos, SEEK_SET);
+    ssize_t len = fread(buf, 1, size, fp);
+    *pos = ftell(fp);
+    return len;
+#endif
 }
+
+#ifndef __KERNEL__
+ssize_t util_write(util_fp_t fp, const void *buf, size_t size, util_off_t *pos)
+{
+    fseek(fp, *pos, SEEK_SET);
+    ssize_t len = fwrite(buf, 1, size, fp);
+    *pos = ftell(fp);
+    return len;
+}
+
+size_t util_filesize(util_fp_t fp)
+{
+    size_t pos = ftell(fp);
+    fseek(fp, 0, SEEK_END);
+    size_t size = ftell(fp);
+    fseek(fp, pos, SEEK_SET);
+    return size;
+}
+
+#endif

@@ -6,8 +6,8 @@ $(MODNAME)-y	+= \
 	watcher/watcher.o \
 	watcher/ksyms.o \
     validator/validator.o \
-    utils/reader.o \
-    elf/elf-op.o \
+    utils/fs.o \
+    elf/elf-parser.o \
     crypto/sha256.o \
     crypto/rsa.o \
     crypto/pkcs1.o \

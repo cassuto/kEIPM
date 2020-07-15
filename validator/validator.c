@@ -1,10 +1,27 @@
-#include <linux/string.h>
+/*
+ *  kEIPM (kerenl ELF Integrity Protection Module)
+ *  Copyright (C) 2020 cassuto <diyer175@hotmail.com> & KingOfSmail
+ * 
+ *  This project is free edition; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public             
+ *  License(GPL) as published by the Free Software Foundation; either      
+ *  version 2.1 of the License, or (at your option) any later version.     
+ *                                                                         
+ *  This project is distributed in the hope that it will be useful,        
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of         
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU      
+ *  Lesser General Public License for more details.                        
+ */
+#include "cert-validator.h"
+#include "asn1-parser/dsl.h"
+#include "asn1-parser/x509.h"
+#include "asn1-parser/internal/macros.h"
 #include "elf-op.h"
 #include "rsa.h"
 #include "sha.h"
 #include "signature.h"
 #include "pem-parser.h"
-#include "cert-validator.h"
+#include <linux/string.h>
 
 #include "validator.h"
 
@@ -12,8 +29,10 @@
 #define MAX_N_PUBKEY 5
 /** Define max number of root CA certificates built-in this module */
 #define MAX_N_CA 5
+/** Define max size of certificate in bytes */
+#define MAX_CERT_BUFFER 65536
 /** Define max size of signature data in bytes */
-#define MAX_ENCDATA_BUFFER 1024*1024L
+#define MAX_ENC_DIGEST_BUFFER 65536
 
 typedef struct pubkey_info {
     char *              issuer;
@@ -26,7 +45,8 @@ typedef struct cert_info {
 } cert_info_t;
 
 static struct validator {
-    uint8_t             edat_buff[MAX_ENCDATA_BUFFER];
+    uint8_t             cert_buff[MAX_CERT_BUFFER];
+    uint8_t             edigest_buff[MAX_ENC_DIGEST_BUFFER];
     uint8_t             hash[SHA256_DIGEST_SIZE];
     struct sha256_state sha_state;
     uint8_t             sha_filechunk[SHA256_BLOCK_SIZE];
@@ -37,8 +57,8 @@ static struct validator {
 } vld;
 
 /**
- * @brief Inner. Callback of elf_foreach_segment(). 
- * To hash each LOAD segment of the ELF
+ * @brief Callback for elf_foreach_segment(). 
+ * Hash each LOAD segment of the ELF
  */
 static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opaque)
 {
@@ -71,68 +91,110 @@ static keipm_err_t hash_elf(struct elf_op *parser)
     return ERROR(kEIPM_OK, NULL);
 }
 
-/**
- * @brief Inner. Validate signature by means of RSA
- */
-static keipm_err_t vld_rsa_signature(const uint8_t *edat, size_t edat_len)
+static keipm_err_t verify_rsa_sign_(
+    const uint8_t *edigest, size_t edigest_len,
+    const uint8_t *modulus, size_t modulus_len,
+    const uint8_t *public_exponent, size_t public_exponent_len)
 {
     keipm_err_t res;
     struct rsa_req rsa;
     struct rsa_key raw_key;
     unsigned int maxsize;
-    size_t i;
-
     rsa_init_req(&rsa);
+    rsa.dst = NULL;
 
-    /*
-     * Try foreach pubkeys
-     */
-    for(i=0; i<vld.num_pubkey; ++i) {
-        rsa.dst = NULL;
-
-        raw_key.n = vld.pubkeys[i].key.modulus;
-        raw_key.n_sz = vld.pubkeys[i].key.modulus_len;
-        raw_key.e = vld.pubkeys[i].key.public_exponent;
-        raw_key.e_sz = vld.pubkeys[i].key.public_exponent_len;
-        if (rsa_set_pub_key(&rsa, &raw_key)) {
-            res = ERROR(kEIPM_ERR_UNTRUSTED, "rsa: signature public key not valid");
-            goto error;
-        }
-
-        /* Find out new modulus size from rsa implementation */
-        maxsize = rsa_max_size(&rsa);
-        if (maxsize > PAGE_SIZE) {
-            res = ERROR(kEIPM_ERR_MALFORMED, "rsa: size of modulus is out of PAGE_SIZE");
-            goto error;
-        }
-        rsa.src = edat;
-        rsa.src_len = edat_len;
-        rsa.dst_len = maxsize;
-        rsa.dst = kmalloc(rsa.dst_len, GFP_KERNEL);
-        if (rsa_verify(&rsa)) {
-            res = ERROR(kEIPM_ERR_MALFORMED, "rsa: unexpected error");
-            goto error;
-        }
-
-        /* note that we merely take ZERO padding mode */
-        if ((rsa.dst_len >= sizeof(vld.hash)) && (memcmp(rsa.dst, vld.hash, sizeof(vld.hash)) == 0)) {
-            res = ERROR(kEIPM_OK, NULL);
-            goto error;
-        } else {
-            res = ERROR(kEIPM_ERR_UNTRUSTED, "signature not valid");
-        }
-
-    error:
-        kfree(rsa.dst);
-        rsa.dst = NULL;
-        rsa_exit_req(&rsa);
-
-        if (res.errno == kEIPM_OK) {
-            break;
-        }
+    raw_key.n = modulus;
+    raw_key.n_sz = modulus_len;
+    raw_key.e = public_exponent;
+    raw_key.e_sz = public_exponent_len;
+    if (rsa_set_pub_key(&rsa, &raw_key)) {
+        res = ERROR(kEIPM_ERR_UNTRUSTED, "rsa: signature public key not valid");
+        goto out;
     }
 
+    /* Find out new modulus size from rsa implementation */
+    maxsize = rsa_max_size(&rsa);
+    if (maxsize > PAGE_SIZE) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: size of modulus is out of PAGE_SIZE");
+        goto out;
+    }
+    rsa.src = edigest;
+    rsa.src_len = edigest_len;
+    rsa.dst_len = maxsize;
+    rsa.dst = kmalloc(rsa.dst_len, GFP_KERNEL);
+    if (rsa_verify(&rsa)) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: unexpected error");
+        goto out;
+    }
+
+    /* note that we merely take ZERO padding mode */
+    if ((rsa.dst_len >= sizeof(vld.hash)) && (memcmp(rsa.dst, vld.hash, sizeof(vld.hash)) == 0)) {
+        res = ERROR(kEIPM_OK, NULL);
+        goto out;
+    } else {
+        res = ERROR(kEIPM_ERR_UNTRUSTED, "signature not valid");
+    }
+
+out:
+    kfree(rsa.dst);
+    rsa.dst = NULL;
+    rsa_exit_req(&rsa);
+
     return res;
+}
+
+static keipm_err_t verify_rsa_signature(const uint8_t *edigest, size_t edigest_len)
+{
+    keipm_err_t err;
+    size_t i;
+    /* Try for each built-in pubkey */
+    for(i=0; i<vld.num_pubkey; ++i) {
+        err = verify_rsa_sign_(
+                edigest, edigest_len,
+                vld.pubkeys[i].key.modulus,
+                vld.pubkeys[i].key.modulus_len,
+                vld.pubkeys[i].key.public_exponent,
+                vld.pubkeys[i].key.public_exponent_len);
+        if (err.errno == kEIPM_OK) {
+            return err;
+        }
+    }
+    return err;
+}
+
+static keipm_err_t verify_cert_signature(const uint8_t *cert_data, size_t cert_len,
+                                    const uint8_t *edigest, size_t edigest_len)
+{
+    keipm_err_t err;
+    size_t i;
+    static x509_cert_t cert;
+    asn1_parser_t parser;
+
+    asn1_init(&parser, cert_data, cert_len);
+
+    RETURN_ON_ERROR(x509_parse_cert(&parser, &cert));
+
+    /* check public key algorithm */
+    switch (cert.pubkey.algorithm) {
+        case X509_PUBKEY_RSA:
+            break;
+        default:
+            return ERROR(kEIPM_ERR_INVALID, "certificate: unsupported pubkey algorithm");
+    }
+
+    /* Try for each root CA */
+    for(i=0; i<vld.num_cert;++i) {
+        err = cert_validate(vld.certs[i].data, vld.certs[i].length,
+                        &parser, &cert);
+        if (err.errno == kEIPM_OK) {
+            return verify_rsa_sign_(
+                edigest, edigest_len,
+                cert.pubkey.key.rsa.n, cert.pubkey.key.rsa.n_num,
+                cert.pubkey.key.rsa.e, cert.pubkey.key.rsa.e_num
+            );
+        }
+    }
+    return ERROR(kEIPM_ERR_INVALID, "elf: signature is invalid");
 }
 
 static keipm_err_t validate_elf(struct elf_op *parser)
@@ -140,9 +202,11 @@ static keipm_err_t validate_elf(struct elf_op *parser)
     keipm_err_t err;
     Elf64_Off sig_section_off;
     Elf64_Xword sig_section_size;
-    util_off_t edat_pos;
-    size_t edat_size;
     uint8_t sig_hdr[2];
+    uint8_t sig_hdr_cert_len[2];
+    size_t sig_hdr_size;
+    size_t cert_size = 0;
+    size_t edigest_size;
     util_off_t pos;
     ssize_t len;
 
@@ -154,6 +218,7 @@ static keipm_err_t validate_elf(struct elf_op *parser)
         return ERROR(kEIPM_ERR_INVALID, "elf: no signature");
     }
 
+    /* read out signature header */
     pos = sig_section_off;
     len = util_read(parser->fp, sig_hdr, sizeof(sig_hdr), &pos);
     if (len != sizeof(sig_hdr)) {
@@ -164,25 +229,50 @@ static keipm_err_t validate_elf(struct elf_op *parser)
         return ERROR(kEIPM_ERR_INVALID, "elf: signature was broken");
     }
 
+    switch (sig_hdr[1]) {
+        case SIG_HDR_TYPE_RSA_KEY: {
+            sig_hdr_size = sizeof(sig_hdr);
+            break;
+        }
+        case SIG_HDR_TYPE_CERT: {
+            /* read out length of cert */
+            len = util_read(parser->fp, sig_hdr_cert_len, sizeof(sig_hdr_cert_len), &pos);
+            if (len <= 0) {
+                return ERROR(kEIPM_ERR_INVALID, "elf: can't not read file");
+            }
+            /* read out certificate data */
+            cert_size = ((sig_hdr_cert_len[1] << 8) | sig_hdr_cert_len[0]);
+            cert_size = MIN(cert_size, sizeof(vld.cert_buff));
+            len = util_read(parser->fp, vld.cert_buff, cert_size, &pos);
+            if (len != cert_size) {
+                return ERROR(kEIPM_ERR_INVALID, "elf: invalid size of signature");
+            }
+            sig_hdr_size = sizeof(sig_hdr) + sizeof(sig_hdr_cert_len) + cert_size;
+            break;
+        }
+        default: {
+            return ERROR(kEIPM_ERR_INVALID, "elf: signature was broken");
+        }
+    }
+
     RETURN_ON_ERROR(hash_elf(parser));
 
     /* read out encrypted digest from signature section */
-    edat_pos = pos;
-    edat_size = MIN(sig_section_size-sizeof(sig_hdr), sizeof(vld.edat_buff));
-    len = util_read(parser->fp, vld.edat_buff, edat_size, &edat_pos);
-    if (len <= 0) {
+    edigest_size = MIN(sig_section_size-sig_hdr_size, sizeof(vld.edigest_buff));
+    len = util_read(parser->fp, vld.edigest_buff, edigest_size, &pos);
+    if (len != edigest_size) {
         return ERROR(kEIPM_ERR_INVALID, "elf: can't not read file");
     }
 
     switch (sig_hdr[1]) {
         case SIG_HDR_TYPE_RSA_KEY: {
-            RETURN_ON_ERROR(vld_rsa_signature(vld.edat_buff, edat_size));
+            RETURN_ON_ERROR(verify_rsa_signature(vld.edigest_buff, edigest_size));
             break;
         }
-        case SIG_HDR_TYPE_CERT:
+        case SIG_HDR_TYPE_CERT: {
+            RETURN_ON_ERROR(verify_cert_signature(vld.cert_buff, cert_size, vld.edigest_buff, edigest_size));
             break;
-        default:
-            return ERROR(kEIPM_ERR_INVALID, "elf: signature was broken");
+        }
     }
 
     return ERROR(kEIPM_OK, NULL);

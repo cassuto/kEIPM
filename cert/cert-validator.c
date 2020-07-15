@@ -86,14 +86,12 @@ error:
 	return res;
 }
 
-static struct sha256_state sha256_sst;
-/*
- * Note that this is not reenterable
- */
+/* IMPORTANT! This is NOT reenterable */
 keipm_err_t validate_signature(const x509_pubkey_t *pubkey, x509_pubkey_params_t params,
     const x509_signature_t *sig, const uint8_t *raw, size_t raw_num,
     void *ctx)
 {
+    static struct sha256_state sha256_sst;
     uint8_t hash[64] = {0};
     size_t hash_len;
     const unsigned char *oid = NULL;
@@ -163,50 +161,35 @@ static keipm_err_t find_issuer(const uint8_t *buf, size_t length, const x509_cer
 	return x509_find_issuer(&parser, cert, issuer);
 }
 
-static x509_cert_t issuer, cert;
-static x509_path_t path;
-static asn1_parser_t parser;
 /**
  * @brief Validate a cert
  * Note that this is not reenterable
  */
 keipm_err_t cert_validate(const uint8_t *trust, size_t trust_length,
-    const uint8_t *contents, size_t contents_length)
+    asn1_parser_t *parser, x509_cert_t *cert)
 {
     keipm_err_t err;
-    static asn1_time_t now;
+    asn1_time_t now;
+    static x509_cert_t issuer;
+    x509_path_t path;
 
     get_current_time(&now);
-    
-    asn1_init(&parser, contents, contents_length);
 
-    RETURN_ON_ERROR(x509_parse_cert(&parser, &cert));
-
-    if (trust != NULL) {
-        err = find_issuer(trust, trust_length, &cert, &issuer);
-        if (err.errno != kEIPM_OK) {
-            return err;
-        }
-    } else {
-        issuer = cert;
-        RETURN_ON_ERROR(x509_parse_cert(&parser, &cert));
-    }
-
-    x509_path_init(&path, &issuer, &now, validate_signature, NULL);
-
-    while (!asn1_end(&parser)) {
-        err = x509_path_add(&path, &cert);
-        if (err.errno != kEIPM_OK) {
-            return err;
-        }
-
-        RETURN_ON_ERROR(x509_parse_cert(&parser, &cert));
-    }
-
-    err = x509_path_end(&path, &cert);
+    err = find_issuer(trust, trust_length, cert, &issuer);
     if (err.errno != kEIPM_OK) {
         return err;
     }
 
-    return ERROR(kEIPM_OK, NULL);
+    x509_path_init(&path, &issuer, &now, validate_signature, NULL);
+
+    while (!asn1_end(parser)) {
+        err = x509_path_add(&path, cert);
+        if (err.errno != kEIPM_OK) {
+            return err;
+        }
+
+        RETURN_ON_ERROR(x509_parse_cert(parser, cert));
+    }
+
+    return x509_path_end(&path, cert);
 }

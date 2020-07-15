@@ -27,6 +27,7 @@ typedef long int util_off_t;
 extern ssize_t util_read(util_fp_t fp, void *buf, size_t size, util_off_t *pos);
 #ifndef __KERNEL__
 extern ssize_t util_write(util_fp_t fp, const void *buf, size_t size, util_off_t *pos);
+extern size_t util_filesize(util_fp_t fp);
 #endif
 
 #ifdef __KERNEL__

@@ -1,3 +1,17 @@
+/*
+ *  kEIPM (kerenl ELF Integrity Protection Module)
+ *  Copyright (C) 2020 cassuto <diyer175@hotmail.com> & KingOfSmail
+ * 
+ *  This project is free edition; you can redistribute it and/or
+ *  modify it under the terms of the GNU Lesser General Public             
+ *  License(GPL) as published by the Free Software Foundation; either      
+ *  version 2.1 of the License, or (at your option) any later version.     
+ *                                                                         
+ *  This project is distributed in the hope that it will be useful,        
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of         
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU      
+ *  Lesser General Public License for more details.                        
+ */
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -26,9 +40,9 @@ static int __init keipm_init(void)
     
     validator_init();
 
-    // Add root cert
+    /* Add root cert */
     TRACE_ERROR(validator_add_root_cert("kEIPM", g_ca, g_cbca));
-    // Set built-in private key
+    /* Set built-in private key */
     TRACE_ERROR(validator_add_pubkey("kEIPM", g_public_pkcs1, g_cbpublic_pkcs1));
 
     TRACE_ERROR(watcher_init());
