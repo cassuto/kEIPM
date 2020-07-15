@@ -71,11 +71,11 @@ static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opa
     remain = flen;
     pos = foffset;
     while(remain > 0) {
-        len = util_read(elfop->fp, vld.sha_filechunk, sizeof(vld.sha_filechunk), &pos);
+        size_t to_read = MIN(remain, sizeof(vld.sha_filechunk));
+        len = util_read(elfop->fp, vld.sha_filechunk, to_read, &pos);
         if (len <= 0) {
             break;
         }
-        printk("%d", len);
         sha256_update(&vld.sha_state, vld.sha_filechunk, len, sha256_block);
         remain -= len;
     }
@@ -130,8 +130,9 @@ static keipm_err_t verify_rsa_sign_(
         goto out;
     }
 
-    /* note that we merely take ZERO padding mode */
-    if ((rsa.dst_len >= sizeof(vld.hash)) && (memcmp(rsa.dst, vld.hash, sizeof(vld.hash)) == 0)) {
+    /* anti leading ZERO padding */
+    if ((rsa.dst_len >= sizeof(vld.hash))
+            && (memcmp(rsa.dst+(rsa.dst_len-sizeof(vld.hash)), vld.hash, sizeof(vld.hash)) == 0)) {
         res = ERROR(kEIPM_OK, NULL);
         goto out;
     } else {

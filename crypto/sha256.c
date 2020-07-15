@@ -18,8 +18,10 @@
  *
  */
 #include "utils.h"
+#ifdef __KERNEL__
 #include <asm/unaligned.h>
 #include <linux/kernel.h>
+#endif
 #include "sha.h"
 
 const u8 sha224_zero_message_hash[SHA224_DIGEST_SIZE] = {
@@ -53,7 +55,7 @@ static inline u32 Maj(u32 x, u32 y, u32 z)
 
 static inline void LOAD_OP(int I, u32 *W, const u8 *input)
 {
-	W[I] = get_unaligned_be32((__u32 *)input + I);
+	W[I] = get_unaligned_be32((u32 *)input + I);
 }
 
 static inline void BLEND_OP(int I, u32 *W)

@@ -50,7 +50,8 @@ keipm_err_t copy_section(util_fp_t fp, size_t src_foff,size_t total, util_fp_t w
     fseek(fp, src_foff, SEEK_SET);
     fseek(wfp, dst_foff, SEEK_SET);
     while(remain > 0) {
-        rlen = fread(chunk, 1,sizeof(chunk), fp);
+        size_t to_read = MIN(sizeof(chunk), remain);
+        rlen = fread(chunk, 1,to_read, fp);
         if (ferror(fp) || rlen == 0) {
             break;
         }

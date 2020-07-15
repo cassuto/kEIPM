@@ -21,8 +21,12 @@
 int main(int argc, char *argv[])
 {
     keipm_err_t err;
+
+    extern void dump_hash(const char *target_elf);
+
     err = keipm_set_UserCA("./user.der", "/home/ain/test");
     printf("%s\n",err.reason ? err.reason : "OK");
+
 #if 0
     RootCa ca;
     ca.Root_Country = "c";
