@@ -35,7 +35,6 @@ static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opa
         if (len <= 0) {
             break;
         }
-        printf("r%x ", params->sha_filechunk[0]);
         SHA256_Update(&params->sha, params->sha_filechunk, len);
         remain -= len;
     }
@@ -95,7 +94,7 @@ out:
     return ERROR(kEIPM_OK, NULL);
 }
 
-keipm_err_t sign_elf_rsa(const char *target_elf, const char *in_pri_key)
+static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *in_pri_key)
 {
     keipm_err_t err;
     int ret;
@@ -103,7 +102,8 @@ keipm_err_t sign_elf_rsa(const char *target_elf, const char *in_pri_key)
     BIO *keybio = NULL;
     RSA *rsa = NULL;
     uint8_t elf_digest[SHA256_DIGEST_LENGTH];
-    uint8_t elf_signature[SIG_RSA_BITS/8];
+    uint8_t *elf_sign = NULL;
+    size_t elf_sign_size;
     struct elf_op elfop;
     util_fp_t fp_elf_rd = NULL;
     util_fp_t fp_elf_wb = NULL;
@@ -128,7 +128,7 @@ keipm_err_t sign_elf_rsa(const char *target_elf, const char *in_pri_key)
      */
     fp_elf_rd = fopen(backup_pathname, "rb");
     if (!fp_elf_rd) {
-        err = ERROR(kEIPM_ERR_MALFORMED, "can not read ELF file");
+        err = ERROR(kEIPM_ERR_MALFORMED, "Can not read ELF file. Please check your path and permission.");
         goto out;
     }
     elf_setfile(&elfop, fp_elf_rd);
@@ -137,27 +137,35 @@ keipm_err_t sign_elf_rsa(const char *target_elf, const char *in_pri_key)
         goto out;
     }
 
-    /*
-     * Load private key
-     */
-    keybio = BIO_new_file(in_pri_key, "r");
-    if (!keybio) {
-        err = ERROR(kEIPM_ERR_MALFORMED, "can not read private key file");
-        goto out;
+    if (by_rsa) {
+        /*
+        * Load private key
+        */
+        keybio = BIO_new_file(in_pri_key, "r");
+        if (!keybio) {
+            err = ERROR(kEIPM_ERR_MALFORMED, "can not read private key file");
+            goto out;
+        }
+
+        rsa = PEM_read_bio_RSAPrivateKey(keybio, &rsa, NULL, NULL); 
+        if (!rsa) {
+            err = ERROR(kEIPM_ERR_MALFORMED, "can not load private key file");
+            goto out;
+        }
+
+        elf_sign_size = SIG_RSA_BITS / 8;
+        sig_section_size = sizeof(sig_hdr) + elf_sign_size;
+    } else {
+
     }
 
-    rsa = PEM_read_bio_RSAPrivateKey(keybio, &rsa, NULL, NULL); 
-    if (!rsa) {
-        err = ERROR(kEIPM_ERR_MALFORMED, "can not load private key file");
-        goto out;
-    }
+    elf_sign = (uint8_t *)malloc(elf_sign_size);
+    sig_section_buff = (uint8_t*)malloc(sig_section_size);
 
     /*
      * Pass #1: temporarily fill zeros with signature section,
      * so we can create target ELF
      */
-    sig_section_size = sizeof(sig_hdr) + sizeof(elf_signature);
-    sig_section_buff = (uint8_t*)malloc(sig_section_size);
     memset(sig_section_buff, 0, sig_section_size);
 
     /*
@@ -189,25 +197,33 @@ keipm_err_t sign_elf_rsa(const char *target_elf, const char *in_pri_key)
         goto out;
     }
 
-    /*
-     * Compute RSA signature of digest now
-     */
-    memset(elf_signature, 0, sizeof(elf_signature));
-    ret = RSA_private_encrypt(sizeof(elf_signature),
-                                elf_digest,
-                                elf_signature, rsa, RSA_NO_PADDING);
-    if (ret != sizeof(elf_signature)) {
-        err = ERROR(kEIPM_ERR_MALFORMED, "failed on RSA encrypt");
-        goto out;
+    if (by_rsa) {
+        /*
+        * Compute RSA signature of digest now
+        */
+        memset(elf_sign, 0, elf_sign_size);
+        ret = RSA_private_encrypt(elf_sign_size,
+                                    elf_digest,
+                                    elf_sign, rsa, RSA_NO_PADDING);
+        if (ret != elf_sign_size) {
+            err = ERROR(kEIPM_ERR_MALFORMED, "failed on RSA encrypt");
+            goto out;
+        }
+    } else {
+
     }
 
     /*
-     * Construct signature header
+     * Construct signature section
      */
     sig_hdr[0] = SIG_HDR_MAGIC;
-    sig_hdr[1] = SIG_HDR_TYPE_RSA_KEY;
+    sig_hdr[1] = by_rsa ? SIG_HDR_TYPE_RSA_KEY : SIG_HDR_TYPE_CERT;
     memcpy(sig_section_buff, sig_hdr, sizeof(sig_hdr));
-    memcpy(sig_section_buff+sizeof(sig_hdr), elf_signature, sizeof(elf_signature));
+    if (by_rsa) {
+        memcpy(sig_section_buff+sizeof(sig_hdr), elf_sign, elf_sign_size);
+    } else {
+
+    }
 
     /*
      * Write back signature to target ELF
@@ -226,7 +242,18 @@ out:
     if (rsa) RSA_free(rsa);
     if (fp_elf_rd) fclose(fp_elf_rd);
     if (fp_elf_wb) fclose(fp_elf_wb);
+    if (elf_sign) free(elf_sign);
     if (sig_section_buff) free(sig_section_buff);
     elf_exit(&elfop);
     return err;
+}
+
+keipm_err_t keipm_set_Key(const char* prikey_path,const char* elf_path)
+{
+    return sign_elf(elf_path, 1, prikey_path);
+}
+
+keipm_err_t keipm_set_UserCA(const char* UserCA_Path,const char* elf_Path)
+{
+    return sign_elf(elf_Path, 1, UserCA_Path);
 }

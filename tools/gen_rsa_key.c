@@ -8,7 +8,7 @@
 
 #define BUG_CHECK "Internal error of libssl. Please check your OpenSSL library and then retry"
 
-keipm_err_t gen_rsa_pri_key(const char *out_pri_key)
+keipm_err_t keipm_create_PrivateKey(const char *out_pri_key)
 {
     keipm_err_t err;
     int ret;
@@ -44,7 +44,7 @@ keipm_err_t gen_rsa_pri_key(const char *out_pri_key)
      * Write private key with format of PEM PKCS#1 to file
      */
     pri_len = BIO_pending(pri);
-    pri_key = (char*)malloc(pri_len + 1);
+    pri_key = (char*)calloc(pri_len + 1, sizeof(char));
     ret = BIO_read(pri, pri_key, pri_len);
     if (ret != pri_len) {
         err = ERROR(kEIPM_ERR_MALFORMED, BUG_CHECK);
@@ -53,7 +53,7 @@ keipm_err_t gen_rsa_pri_key(const char *out_pri_key)
 
     fp = fopen(out_pri_key, "wb");
     if (!fp) {
-        err = ERROR(kEIPM_ERR_MALFORMED, "can not write target file");
+        err = ERROR(kEIPM_ERR_MALFORMED, "Can not write target file. Please check your path and permission.");
         goto out;
     }
     len = fwrite(pri_key, 1,pri_len, fp);
@@ -73,7 +73,7 @@ out:
     return err;
 }
 
-keipm_err_t gen_rsa_pub_key(const char *in_pri_key, const char *out_pub_key)
+keipm_err_t keipm_create_PublicKey(const char* out_pub_key, const char* in_pri_key)
 {
     keipm_err_t err;
     int ret;
@@ -83,7 +83,7 @@ keipm_err_t gen_rsa_pub_key(const char *in_pri_key, const char *out_pub_key)
 
     keybio = BIO_new_file(in_pri_key, "r");
     if (!keybio) {
-        err = ERROR(kEIPM_ERR_MALFORMED, "can not read private key file");
+        err = ERROR(kEIPM_ERR_MALFORMED, "Can not read private key file. Please check your path and permission.");
         goto out;
     }
 
@@ -95,7 +95,7 @@ keipm_err_t gen_rsa_pub_key(const char *in_pri_key, const char *out_pub_key)
 
     outbio = BIO_new_file(out_pub_key, "w");
     if (!keybio) {
-        err = ERROR(kEIPM_ERR_MALFORMED, "can not write public key file");
+        err = ERROR(kEIPM_ERR_MALFORMED, "Can not write public key file. Please check your path and permission.");
         goto out;
     }
 
