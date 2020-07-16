@@ -88,7 +88,7 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
                 }
             }
             traced_file = pathname;
-            if (strcmp(pathname,"/home/ain/test")==0) {
+            printk("%s\n", pathname);
             /*
              * Parse the traced file
              * that file indicated by pathname may be not an ELF.
@@ -102,7 +102,6 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
                 return -ENOEXEC;
             }
             filp_close(file, NULL);
-            }
         }
     }
 
@@ -116,10 +115,6 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
 static int on_load_elf_library(struct file *file)
 {
     pfn_load_elf_library org = (pfn_load_elf_library)p_load_elf_library;
-    if(validator_analysis_binary(file)) {
-        return -ENOEXEC;
-    }
-    /* normally load */
     return (*org)(file);
 }
 
@@ -154,7 +149,7 @@ keipm_err_t watcher_init(void)
             
             /* hook load_elf_library() */
             pp_elf_format_load_elf_library = &pointers[i];
-            //pointers[i] = (uintptr_t)on_load_elf_library;
+            pointers[i] = (uintptr_t)on_load_elf_library;
         }
     }
 

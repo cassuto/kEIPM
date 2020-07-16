@@ -694,7 +694,7 @@ public:
         retranslateUi(Widget);
         QObject::connect(Btn_Cancel, SIGNAL(clicked()), Widget, SLOT(close()));
 
-        tabWidget->setCurrentIndex(4);
+        tabWidget->setCurrentIndex(0);
 
 
         QMetaObject::connectSlotsByName(Widget);

@@ -35,7 +35,7 @@ typedef struct UserCa_inf{
 extern keipm_err_t keipm_set_UserCA(const char* UserCA_Path,const char* elf_Path);
 
 /**
- * @brief 进行秘钥签名
+ * @brief 进行密钥签名
  * @param [in] prikey_path 用户私钥文件路径名
  * @param [in] elf_path elf路径文件名
 */
