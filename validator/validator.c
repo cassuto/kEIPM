@@ -89,7 +89,7 @@ static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opa
 static keipm_err_t hash_elf(struct elf_op *parser)
 {
     sha256_init(&vld.sha_state);
-    RETURN_ON_ERROR(elf_foreach_segment(parser, PT_LOAD, on_elf_segment, parser));
+    RETURN_ON_ERROR(elf_foreach_segment(parser, PT_LOAD, on_elf_segment, parser, 1));
     sha256_finalize(&vld.sha_state, sha256_block);
     sha256_fill_digest(&vld.sha_state, vld.hash);
     return ERROR(kEIPM_OK, NULL);

@@ -76,7 +76,7 @@ keipm_err_t elf_find_section(struct elf_op *ep, const char *name, Elf64_Off type
     return ERROR(kEIPM_ERR_INVALID, "elf: section not found");
 }
 
-keipm_err_t elf_foreach_segment(struct elf_op *ep, Elf64_Word target_type, pfn_on_segment callback, void *opaque)
+keipm_err_t elf_foreach_segment(struct elf_op *ep, Elf64_Word target_type, pfn_on_segment callback, void *opaque, uint8_t code_only)
 {
     ssize_t len;
     Elf64_Sword i;
@@ -93,6 +93,10 @@ keipm_err_t elf_foreach_segment(struct elf_op *ep, Elf64_Word target_type, pfn_o
 
         if (phdr.p_type == target_type) {
             RETURN_ON_ERROR((*callback)(phdr.p_offset, phdr.p_filesz, opaque));
+            /* only process code segment (i.e. the first segment) */
+            if (code_only) {
+                break;
+            }
         }
     }
     return ERROR(kEIPM_OK, NULL);

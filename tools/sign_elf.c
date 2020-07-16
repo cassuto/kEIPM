@@ -72,7 +72,7 @@ static keipm_err_t hash_elf(struct elf_op *parser, uint8_t digest[SHA256_DIGEST_
     struct hash_elf_params params;
     params.elfop = parser;
     SHA256_Init(&params.sha);
-    RETURN_ON_ERROR(elf_foreach_segment(parser, PT_LOAD, on_elf_segment, &params));
+    RETURN_ON_ERROR(elf_foreach_segment(parser, PT_LOAD, on_elf_segment, &params, 1));
     SHA256_Final(digest, &params.sha);
     return ERROR(kEIPM_OK, NULL);
 }
@@ -94,7 +94,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
     BIO *keybio = NULL;
     RSA *rsa = NULL;
     FILE *fp_cert = NULL;
-    size_t cert_size;
+    size_t cert_size = 0;
     uint8_t elf_digest[SHA256_DIGEST_LENGTH];
     uint8_t *elf_sign = NULL;
     size_t elf_sign_size;
