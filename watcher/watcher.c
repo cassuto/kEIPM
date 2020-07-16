@@ -88,20 +88,22 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
                 }
             }
             traced_file = pathname;
-            printk("%s\n", pathname);
-            /*
-             * Parse the traced file
-             * that file indicated by pathname may be not an ELF.
-             */
-            file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
-            if (IS_ERR(file)) {
-                return 0;
-            }
-            if(validator_analysis_binary(file)) {
+            if (verify_fs(pathname).errno ==kEIPM_OK) {
+                /*
+                * Parse the traced file
+                * that file indicated by pathname may be not an ELF.
+                */
+                file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
+                if (IS_ERR(file)) {
+                    return 0;
+                }
+                if(validator_analysis_binary(file)) {
+                    filp_close(file, NULL);
+                    printk("%s signature invalid", pathname);
+                    return -EPERM;
+                }
                 filp_close(file, NULL);
-                return -ENOEXEC;
             }
-            filp_close(file, NULL);
         }
     }
 

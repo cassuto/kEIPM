@@ -310,6 +310,16 @@ void validator_init(void) {
     vld.num_cert = 0;
 }
 
+keipm_err_t verify_fs(const char *pathname) {
+    if (strncmp(pathname, "/proc", sizeof("/proc")-1)==0) {
+        return ERROR(kEIPM_ERR_INVALID, NULL);
+    }
+    if (strncmp(pathname, "/dev", sizeof("/dev")-1)==0) {
+        return ERROR(kEIPM_ERR_INVALID, NULL);
+    }
+    return ERROR(kEIPM_OK, NULL);
+}
+
 /**
  * @brief Add a RSA public key
  */
