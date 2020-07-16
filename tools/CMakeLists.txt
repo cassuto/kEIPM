@@ -15,7 +15,7 @@ set(SRCS_LIB
 )
 
 set(SRCS_TOOL
-  "${CMAKE_CURRENT_SOURCE_DIR}/sigtool.c"
+  "${CMAKE_CURRENT_SOURCE_DIR}/keipm_cli.c"
 )
 
 #
