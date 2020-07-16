@@ -71,14 +71,29 @@ static int add_ext(X509 *cert, int nid, char *value)
 	X509_add_ext(cert,ex,-1);
 	X509_EXTENSION_free(ex);
 	return 1;
-}	
+}
+
+static X509 *load_cert(const char *filename)
+{
+    X509 *x;
+    BIO *bio = NULL;
+
+    bio = BIO_new_file(filename, "r");
+    if (!bio) {
+        return NULL;
+    }
+    x = d2i_X509_bio(bio, NULL);
+    BIO_free(bio);
+    return x;
+}
 
 /*
  * Format: DER
  * Hash: SHA256
  */
 static keipm_err_t make_cert(const char *out_pathname,
-    RSA **ca_key, /* when ca_key==public_key we suppose we're making CA*/
+    const char *ca_pathname, /* when ca_path==NULL we suppose we're making CA*/
+    RSA **ca_key, 
     RSA **public_key,
     const char *field_C,
     const char *field_S,
@@ -89,13 +104,13 @@ static keipm_err_t make_cert(const char *out_pathname,
 {
     keipm_err_t err;
     int ret;
-	X509 *x = NULL;
+	X509 *x = NULL, *ca = NULL;
 	EVP_PKEY *pk = NULL, *pk_priv = NULL;
 	X509_NAME *name=NULL;
     BIO *bio=NULL;
     uint8_t gen_root = 1;
 	
-    if (*ca_key == *public_key) {
+    if (!ca_pathname) {
         gen_root = 1;
         if ((pk=EVP_PKEY_new()) == NULL) {
             err = ERROR(kEIPM_ERR_MEMORY, "out of memory");
@@ -135,9 +150,6 @@ static keipm_err_t make_cert(const char *out_pathname,
 	X509_set_pubkey(x,pk);
 
     name = X509_get_subject_name(x);
-    if (!gen_root) {
-	    
-    }
 
 	/* This function creates and adds the entry, working out the
 	 * correct string type and performing checks on its length.
@@ -170,6 +182,23 @@ static keipm_err_t make_cert(const char *out_pathname,
 
 	add_ext(x, NID_netscape_comment, "none");
 
+    /*
+     * Copy issuer info from CA when we are generating user cert
+     */
+    if (!gen_root) {
+        ca = load_cert(ca_pathname);
+        if (!ca) {
+            err = ERROR(kEIPM_ERR_MEMORY, "Can not load CA file. Please check your path and permission.");
+            goto out;
+        }
+        name = X509_get_issuer_name(ca);
+        if (!name) {
+            err = ERROR(kEIPM_ERR_MEMORY, "Can not read CA file." BUG_CHECK);
+            goto out;
+        }
+        X509_set_issuer_name(x, name);
+    }
+
 	if (!X509_sign(x, gen_root ? pk : pk_priv, EVP_sha256())) {
         err = ERROR(kEIPM_ERR_MEMORY, "Can not sign cert." BUG_CHECK);
 		goto out;
@@ -197,6 +226,9 @@ out:
     }
     if (x) {
         X509_free(x);
+    }
+    if (ca) {
+        X509_free(ca);
     }
     if (bio) {
         BIO_free(bio);
@@ -231,7 +263,7 @@ keipm_err_t keipm_create_rootCA(const char *rootCA_Path, const RootCa *rootca)
         goto out;
     }
 
-    err = make_cert(rootCA_Path,
+    err = make_cert(rootCA_Path, NULL,
         &private_key,
         &private_key,
         rootca->Root_Country,
@@ -255,6 +287,7 @@ keipm_err_t keipm_create_userCA(const char *out_cert_path, const UserCa *userca)
     keipm_err_t err;
     int ret;
     char private_key_pathname[PATH_MAX];
+    char ca_key_pathname[PATH_MAX];
     RSA *CA_key = NULL;
     RSA *public_key = NULL;
     BIO *keybio = NULL, *outbio = NULL;
@@ -262,7 +295,8 @@ keipm_err_t keipm_create_userCA(const char *out_cert_path, const UserCa *userca)
     /*
      * Load CA private key for signing user cert
      */
-    keybio = BIO_new_file(userca->User_input_RootCA_Path, "r");
+    snprintf(ca_key_pathname, sizeof(ca_key_pathname), "%s.key", userca->User_input_RootCA_Path);
+    keybio = BIO_new_file(ca_key_pathname, "r");
     if (!keybio) {
         err = ERROR(kEIPM_ERR_MALFORMED, "Can not read private key file. Please check your path and permission.");
         goto out;
@@ -296,6 +330,7 @@ keipm_err_t keipm_create_userCA(const char *out_cert_path, const UserCa *userca)
     }
 
     err = make_cert(out_cert_path,
+        userca->User_input_RootCA_Path,
         &CA_key,
         &public_key,
         userca->User_Country,

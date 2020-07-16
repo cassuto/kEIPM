@@ -694,7 +694,7 @@ public:
         retranslateUi(Widget);
         QObject::connect(Btn_Cancel, SIGNAL(clicked()), Widget, SLOT(close()));
 
-        tabWidget->setCurrentIndex(0);
+        tabWidget->setCurrentIndex(4);
 
 
         QMetaObject::connectSlotsByName(Widget);
@@ -704,7 +704,7 @@ public:
     {
         Widget->setWindowTitle(QApplication::translate("Widget", "kEIPM", Q_NULLPTR));
         groupBox_ELF->setTitle(QApplication::translate("Widget", "\345\257\274\345\205\245\350\257\201\344\271\246\344\273\245\347\255\276\345\220\215ELF\346\226\207\344\273\266:", Q_NULLPTR));
-        lab_CASign_CA->setText(QApplication::translate("Widget", "\350\257\201\344\271\246:", Q_NULLPTR));
+        lab_CASign_CA->setText(QApplication::translate("Widget", "\347\224\250\346\210\267\350\257\201\344\271\246", Q_NULLPTR));
         Btn_CASign_CA->setText(QApplication::translate("Widget", "\346\265\217\350\247\210", Q_NULLPTR));
         lab_CASign_elf->setText(QApplication::translate("Widget", "ELF\346\226\207\344\273\266:", Q_NULLPTR));
         Btn_Inport->setText(QApplication::translate("Widget", "\347\255\276\345\220\215", Q_NULLPTR));
@@ -743,7 +743,7 @@ public:
         Btn_output_RootCA->setText(QApplication::translate("Widget", "\347\224\237\346\210\220", Q_NULLPTR));
         Btn_outClose_RootCA->setText(QApplication::translate("Widget", "\351\200\200\345\207\272", Q_NULLPTR));
         tabWidget->setTabText(tabWidget->indexOf(Create_RootCA), QApplication::translate("Widget", "\347\224\237\346\210\220CA\350\257\201\344\271\246", Q_NULLPTR));
-        lab_User_inputRootCA->setText(QApplication::translate("Widget", "\345\257\274\345\205\245CA\347\247\201\351\222\245", Q_NULLPTR));
+        lab_User_inputRootCA->setText(QApplication::translate("Widget", "\345\257\274\345\205\245CA\345\217\212\347\247\201\351\222\245", Q_NULLPTR));
         Btn_User_Visit_RootCA->setText(QApplication::translate("Widget", "\346\265\217\350\247\210", Q_NULLPTR));
         gBox_UserCA_Inf->setTitle(QApplication::translate("Widget", "\350\257\267\350\276\223\345\205\245\347\255\276\345\220\215\344\277\241\346\201\257\357\274\232", Q_NULLPTR));
         lineEd_UserCountry->setPlaceholderText(QApplication::translate("Widget", "Country Name (2 letter code)", Q_NULLPTR));
