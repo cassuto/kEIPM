@@ -14,11 +14,13 @@
  */
 #include <stdint.h>
 #include <limits.h>
+#include <sys/stat.h>
 #include <openssl/rsa.h>
 #include <openssl/sha.h>
 #include <openssl/pem.h>
 #include "signature.h"
-#include "elf-op.h"
+
+#include "elf-op.h" /* see '../elf/elf-writer.c' for details */
 
 #include "api.h"
 
@@ -36,7 +38,7 @@ static keipm_err_t copy_file(const char *src, const char *dst);
 static keipm_err_t check_prev_sig(const char *target_elf);
 
 /**
- * @brief Inner. Callback of elf_foreach_segment(). 
+ * @brief Callback of elf_foreach_segment(). 
  * To hash each LOAD segment of the ELF
  */
 static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opaque)
@@ -60,7 +62,10 @@ static keipm_err_t on_elf_segment(Elf64_Off foffset, Elf64_Xword flen, void *opa
 }
 
 /**
- * @brief Inner. Compute hash of all LOAD segments
+ * @brief Compute hash of all LOAD segments
+ * @param [in] parser pointer to ELF parser struct .
+ * @param [out] digest To store the digest of ELF.
+ * @return error info
  */
 static keipm_err_t hash_elf(struct elf_op *parser, uint8_t digest[SHA256_DIGEST_LENGTH])
 {
@@ -72,6 +77,14 @@ static keipm_err_t hash_elf(struct elf_op *parser, uint8_t digest[SHA256_DIGEST_
     return ERROR(kEIPM_OK, NULL);
 }
 
+/**
+ * Sign the target ELF file. This function is just
+ * a wrapper of ELF writer.
+ * @param [in] target_elf Pathname of target ELF
+ * @param [in] by_rsa 1 if sign by RSA keys, otherwise by certificate
+ * @param [in] in_key if by_rsa==1 this is pathname of RSA private key,
+ *             Otherwise certificate filename.
+ */
 static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *in_key)
 {
     keipm_err_t err;
@@ -96,6 +109,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
     uint8_t *sig_section_buff = NULL;
     size_t sig_section_size;
     Elf64_Off sig_section_foff;
+    struct stat statbuf;
 
     err = check_prev_sig(target_elf);
     if (err.errno != kEIPM_OK) {
@@ -248,6 +262,13 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
         goto out;
     }
 
+    elf_exit(&elfop);
+    fclose(fp_elf_wb);
+    fp_elf_wb = NULL;
+
+    if (stat(target_elf, &statbuf)==0) {
+        chmod(target_elf, (statbuf.st_mode | S_IXUSR));
+    }
 
     err = ERROR(kEIPM_OK, NULL);
 out:
