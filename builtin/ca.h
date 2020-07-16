@@ -61,5 +61,5 @@ const unsigned char g_ca[] =
     0x55, 0xa1, 0xc9, 0xc7, 0x5e, 0xf4, 0x3e, 0xf3, 0x4a, 0x58, 0x97,                              
 };
 
-const unsigned g_cbca = sizeof(g_ca);
+#define g_cbca sizeof(g_ca)
 /* end of file */

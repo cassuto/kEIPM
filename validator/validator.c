@@ -21,6 +21,7 @@
 #include "sha.h"
 #include "signature.h"
 #include "pem-parser.h"
+#include "keipm.h"
 #include <linux/string.h>
 
 #include "validator.h"
@@ -294,7 +295,10 @@ int validator_analysis_binary(struct file *file)
         goto out;
     }
     err = validate_elf(&ep);
-    printk("valid=%d %s\n", err.errno, err.reason);
+
+    if (err.errno != kEIPM_OK) {
+        printk(KERN_WARNING kEIPM "errno = (%d) %s\n", err.errno, err.reason);
+    }
     retval = (err.errno == kEIPM_OK) ? 0 : -ENOEXEC;
 out:
     elf_exit(&ep);

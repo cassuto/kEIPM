@@ -206,9 +206,9 @@ int main(int argc, char *argv[])
 			fprintf(pFileOut,
 					"};\n"
 					"\n"
-					"%sconst unsigned%s g_cb%s = sizeof(g_%s);\n"
+					"#define g_cb%s sizeof(g_%s)\n"
 					"/* end of file */\n",
-					fExport ? "DECLEXPORT(" : "", fExport ? ")" : "", argv[iArg], argv[iArg]);
+					argv[iArg], argv[iArg]);
 
 			/* flush output and check for error. */
 			fflush(pFileOut);

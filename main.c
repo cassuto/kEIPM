@@ -19,33 +19,50 @@
 #include "keipm.h"
 #include "watcher.h"
 #include "validator.h"
-#include "builtin/ca.h"
-#include "builtin/public_pkcs1.h"
+#include "builtin/builtin.h"
 
 MODULE_AUTHOR ("cassuto <diyer175@hotmail.com>");
 MODULE_DESCRIPTION ("kernel ELF Integrity Protection Module");
 MODULE_LICENSE("GPL");
 MODULE_VERSION("1.0.0");
 
+static void trace_error(keipm_err_t err);
+
 static int __init keipm_init(void)
 {
-#define TRACE_ERROR(_x) do { \
-    keipm_err_t _ret = (_x); \
-    if(_ret.errno != kEIPM_OK) { \
-        printk(KERN_ERR kEIPM "%s", _ret.reason); \
-    } \
-}while(0)
+    size_t i;
 
-    printk(KERN_INFO kEIPM "%s\n", __func__);
+    /* banner */
+    printk(KERN_INFO kEIPM "module loaded.\n");
     
     validator_init();
 
-    /* Add root cert */
-    TRACE_ERROR(validator_add_root_cert("builtin/ca.der", g_ca, g_cbca));
-    /* Add built-in public key */
-    TRACE_ERROR(validator_add_pubkey("builtin/public_pkcs1.pem", g_public_pkcs1, g_cbpublic_pkcs1));
+    /*
+     * Load built-in certificates or RSA public keys
+     */
+    for(i=0;i<builtin_num; ++i) {
+        keipm_err_t err;
+        const char *typestr = "unknown";
+        switch (builtin_list[i].type) {
+            case BUILTIN_RSA_PUBKEY:
+                typestr = "RSA pubkey";
+                err = validator_add_pubkey(builtin_list[i].issuer, builtin_list[i].data, builtin_list[i].length);
+                break;
+            case BUILTIN_CERT:
+                typestr = "certificate";
+                err = validator_add_root_cert(builtin_list[i].issuer, builtin_list[i].data, builtin_list[i].length);
+                break;
+            default:
+                continue;
+        }
+        if (err.errno == kEIPM_OK) {
+            printk(KERN_INFO kEIPM "Loaded built-in: %s - %s\n", typestr, builtin_list[i].issuer);
+        } else {
+            trace_error(err);
+        }
+    }
 
-    TRACE_ERROR(watcher_init());
+    trace_error(watcher_init());
     return 0;
 }
 
@@ -57,3 +74,11 @@ static void __exit keipm_exit(void)
 
 module_init(keipm_init);
 module_exit(keipm_exit);
+
+static void trace_error(keipm_err_t err)
+{
+    if(err.errno != kEIPM_OK) {
+        printk(KERN_ERR kEIPM "%s", err.reason);
+    }
+}
+

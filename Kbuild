@@ -3,6 +3,7 @@ MODNAME		?= keipm
 obj-m		+= $(MODNAME).o
 $(MODNAME)-y	+= \
 	main.o \
+    builtin/builtin.o \
 	watcher/watcher.o \
 	watcher/ksyms.o \
     validator/validator.o \
