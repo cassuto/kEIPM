@@ -61,8 +61,8 @@ set(CMAKE_C_FLAGS_PROFILE         "-O2 -pg ${COMMON_WARNINGS}")
 
 ADD_LIBRARY(sigelf ${SRCS_LIB})
 
-add_executable(${PROJECT_NAME} ${SRCS_TOOL})
-target_link_libraries(${PROJECT_NAME}
+add_executable(keipm_cli ${SRCS_TOOL})
+target_link_libraries(keipm_cli
   sigelf
   ${SSL_LIBRARY}
   ${CRYPTO_LIBRARY}
