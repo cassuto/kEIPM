@@ -20,7 +20,7 @@
 #include <openssl/pem.h>
 #include "signature.h"
 
-#include "elf-op.h" /* see '../elf/elf-writer.c' for details */
+#include "elf-op.h" /* see elf-writer.c for details */
 
 #include "api.h"
 

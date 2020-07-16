@@ -67,3 +67,10 @@ target_link_libraries(keipm_cli
   ${SSL_LIBRARY}
   ${CRYPTO_LIBRARY}
 )
+
+install(TARGETS keipm_cli
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+    PUBLIC_HEADER DESTINATION include
+)
