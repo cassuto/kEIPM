@@ -75,11 +75,11 @@ static int trace_error(keipm_err_t err)
     return err.errno;
 }
 
-int sign_elf(const char *elf_pathname, const char *key_pathname, int rsa) {
+static keipm_err_t sign_elf(const char *elf_pathname, const char *key_pathname, int rsa) {
     if (rsa) {
-        return trace_error(keipm_set_Key(key_pathname, elf_pathname));
+        return keipm_set_Key(key_pathname, elf_pathname);
     } else {
-        return trace_error(keipm_set_UserCA(key_pathname, elf_pathname));
+        return keipm_set_UserCA(key_pathname, elf_pathname);
     }
 }
 
@@ -141,8 +141,9 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
                 if (scan_count) {
                     (*scan_count)++;
                 } else {
-                    int ret = sign_elf(buf, key_pathname, rsa);
-                    if (ret && ret!=kEIPM_ERR_INVALID) {
+                    keipm_err_t ret = sign_elf(buf, key_pathname, rsa);
+                    if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
+                        trace_error(ret);
                         ++failed;
                     }
                     ++curr;
@@ -339,7 +340,7 @@ int main(int argc, char *argv[])
         if (flag_sys) {
             return sign_sys_elf(elf_pathname, key_pathname, flag_elf_rsa);
         } else {
-            return sign_elf(elf_pathname, key_pathname, flag_elf_rsa);
+            return trace_error(sign_elf(elf_pathname, key_pathname, flag_elf_rsa));
         }
         
     }

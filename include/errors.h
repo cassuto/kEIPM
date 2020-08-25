@@ -22,6 +22,7 @@ typedef enum keipm_errno {
 	kEIPM_ERR_UNTRUSTED   = 15,
 	kEIPM_ERR_DEPRECATED  = 16,
 	kEIPM_ERR_NOT_FOUND   = 17,
+	kEIPM_ERR_NOT_ELF	  = 18
 } keipm_errno_t;
 
 typedef struct keipm_err {

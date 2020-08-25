@@ -26,12 +26,12 @@ keipm_err_t elf_parse(struct elf_op *parser)
         return ERROR(kEIPM_ERR_MALFORMED, "elf: can not read.");
 	}
     if (memcmp(parser->hdr.e_ident, ELFMAG, SELFMAG)) {
-        return ERROR(kEIPM_ERR_INVALID, "elf: invalid format");
+        return ERROR(kEIPM_ERR_NOT_ELF, "elf: invalid format");
     }
     /* Check if a ELF64 file is presented. ELFCLASS32 is not supported! */
     if ( (parser->hdr.e_ident[4]==ELFCLASSNONE && parser->hdr.e_ehsize != sizeof(parser->hdr)) ||
             (parser->hdr.e_ident[4]!=ELFCLASSNONE && parser->hdr.e_ident[4]!=ELFCLASS64) ) {
-        return ERROR(kEIPM_ERR_INVALID, "elf: not 64bit elf");
+        return ERROR(kEIPM_ERR_NOT_ELF, "elf: not 64bit elf");
     }
     return ERROR(kEIPM_OK, NULL);
 }
