@@ -155,7 +155,7 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
                 continue;
             }
             /* check if it is a ELF file. ELF has no suffix */
-            if (strcmp(get_suffix(buf), "")==0) {
+            if (strcmp(get_suffix(buf), "")==0 || strcmp(get_suffix(buf), "so")==0) {
                 if (scan_count) {
                     (*scan_count)++;
                 } else {
