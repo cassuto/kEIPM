@@ -166,7 +166,7 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
                             printf("\033[0m\nFile: %s.", buf);
                             trace_error(ret);
                             ++failed;
-                        } else {
+                        } else if (ret.errno!=kEIPM_ERR_NOT_ELF) {
                             fprintf(flist, "%s\n", buf);
                         }
                     } else {
