@@ -60,7 +60,7 @@ static int print_help(const char *prog)
     printf("\nSign:\n");
     printf("    Sign ELF by certificate:\n\t%s --sign <ELF filename> <User cert filename>\n", prog);
     printf("    Sign ELF by RSA key:\n\t%s --sign --rsa <ELF filename> <Private key filename> \n", prog);
-    printf("    Sign ALl the system:\n\t%s --sign --sys <Private key filename> \n", prog);
+    printf("    Sign ALl the system:\n\t%s --sign --sys [--rsa] <root path> <User cert / key filename> \n", prog);
 
     return 1;
 }
@@ -162,9 +162,9 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
 
 int sign_sys_elf(const char *path, const char *key_pathname, int rsa) {
     long total_num_files = 0;
-    trave_dir("/", NULL,0,  0,&total_num_files);
+    trave_dir(path, NULL,0,  0,&total_num_files);
     printf("Totally %ld files to signature.\n", total_num_files);
-    trave_dir("/", key_pathname,rsa, total_num_files,NULL);
+    trave_dir(path, key_pathname,rsa, total_num_files,NULL);
     printf("\n");
     return 0;
 }
