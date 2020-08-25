@@ -15,6 +15,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#ifdef __linux__
+#include <sys/types.h>
+#include <dirent.h>
+#include <sys/stat.h>
+#include <linux/limits.h>
+#endif
 #include "errors.h"
 #include "api.h"
 #include "elf-op.h"
@@ -29,6 +35,7 @@ static struct optparse_long longopts[] = {
     {"genuser", 'u', OPTPARSE_OPTIONAL},
     {"sign", 'e', OPTPARSE_OPTIONAL},
     {"rsa", 'r', OPTPARSE_OPTIONAL},
+    {"sys", 'a', OPTPARSE_OPTIONAL},
 
     /* Certificate params */
     {"country", 't', OPTPARSE_OPTIONAL},
@@ -53,18 +60,112 @@ static int print_help(const char *prog)
     printf("\nSign:\n");
     printf("    Sign ELF by certificate:\n\t%s --sign <ELF filename> <User cert filename>\n", prog);
     printf("    Sign ELF by RSA key:\n\t%s --sign --rsa <ELF filename> <Private key filename> \n", prog);
-    
+    printf("    Sign ALl the system:\n\t%s --sign --sys <Private key filename> \n", prog);
+
     return 1;
 }
 
 static int trace_error(keipm_err_t err)
 {
     if (err.errno) {
-        printf("Error: %s.\n", err.reason ? err.reason : "Succeeded");
+        printf("\033[0m\nError: %s.\n", err.reason ? err.reason : "Succeeded");
     } else {
-        printf("%s. \n", err.reason ? err.reason : "Succeeded");
+        printf("\033[0m\n%s. \n", err.reason ? err.reason : "Succeeded");
     }
     return err.errno;
+}
+
+int sign_elf(const char *elf_pathname, const char *key_pathname, int rsa) {
+    if (rsa) {
+        return trace_error(keipm_set_Key(key_pathname, elf_pathname));
+    } else {
+        return trace_error(keipm_set_UserCA(key_pathname, elf_pathname));
+    }
+}
+
+static const char *get_suffix(const char *filename) {
+    for(int i=strlen(filename)-1;i>=0;--i) {
+        if (filename[i]=='.') {
+            return &filename[i]+1;
+        }
+    }
+    return "";
+}
+static int prohibit_path(const char *path) {
+    if (strncmp(path, "/dev/", sizeof("/dev/")-1)==0) {
+        return 1;
+    } else if (strncmp(path, "/proc/", sizeof("/dev/")-1)==0) {
+        return 1;
+    } else if (strncmp(path, "/tmp/", sizeof("/dev/")-1)==0) {
+        return 1;
+    }
+    return 0;
+}
+
+static void trave_dir(const char *path, const char *key_pathname, int rsa, long total, long *scan_count) {
+    DIR *d = NULL;
+    struct dirent *dp = NULL;
+    struct stat st;
+    char buf[PATH_MAX] = {0};
+    static long curr, failed;
+    
+    if (lstat(path, &st) < 0 || !S_ISDIR(st.st_mode)) {
+        ++failed;
+        fprintf(stderr, "\033[0m\ninvalid path: %s\n", path);
+        return;
+    }
+    if (prohibit_path(buf)) {
+        ++failed;
+        fprintf(stderr, "\033[0m\nYou can't signature ELFs in prohibited path: %s\n", path);
+        return;
+    }
+
+    if(!(d = opendir(path))) {
+        ++failed;
+        printf("\033[0m\nopendir[%s] error: %m\n", path);
+        return;
+    }
+
+    while((dp = readdir(d)) != NULL) {
+        int cat_slash = 0;
+        if((!strncmp(dp->d_name, ".", 1)) || (!strncmp(dp->d_name, "..", 2)))
+            continue;
+        cat_slash = path[strlen(path)-1]!='/';
+        snprintf(buf, sizeof(buf), "%s%s%s", path, cat_slash?"/":"", dp->d_name);
+        lstat(buf, &st);
+        if (S_ISLNK(st.st_mode))
+            continue;
+        if (!S_ISDIR(st.st_mode)) {
+            /* check if it is a ELF file. ELF has no suffix */
+            if (strcmp(get_suffix(buf), "")==0) {
+                if (scan_count) {
+                    (*scan_count)++;
+                } else {
+                    int ret = sign_elf(buf, key_pathname, rsa);
+                    if (ret && ret!=kEIPM_ERR_INVALID) {
+                        ++failed;
+                    }
+                    ++curr;
+                    printf("\033[1;31;40m\rProgress: %.2f%% Failed %ld \033[0m", (double)curr/total*100, failed);
+                }
+            }
+        } else {
+            if (!prohibit_path(buf)) {
+                trave_dir(buf, key_pathname, rsa, total, scan_count);
+            }
+        }
+    }
+    closedir(d);
+}
+
+
+int sign_sys_elf(const char *path, const char *key_pathname, int rsa) {
+    long total_num_files = 0;
+    trave_dir("/", NULL,0,  0,&total_num_files);
+    printf("Totally %ld files to signature.\n", total_num_files);
+    trave_dir("/", key_pathname,rsa, total_num_files,NULL);
+    printf("\n");
+    return 0;
 }
 
 int main(int argc, char *argv[])
@@ -75,8 +176,9 @@ int main(int argc, char *argv[])
     int gen_key = 0;
     int gen_ca = 0;
     int gen_user = 0;
-    int sign_elf = 0;
+    int flag_sign_elf = 0;
     int flag_elf_rsa = 0;
+    int flag_sys = 0;
     const char *privkey = NULL, *pubkey = NULL;
     const char *ca_pathname = NULL;
     const char *user_pathname = NULL;
@@ -102,12 +204,19 @@ int main(int argc, char *argv[])
             gen_user = 1;
             break;
         case 'e':
-            sign_elf = 1;
+            flag_sign_elf = 1;
             break;
 
         case 'r':
-            if (sign_elf) {
+            if (flag_sign_elf) {
                 flag_elf_rsa = 1;
+            } else {
+                return print_help(argv[0]);
+            }
+            break;
+        case 'a':
+            if (flag_sign_elf) {
+                flag_sys = 1;
             } else {
                 return print_help(argv[0]);
             }
@@ -207,11 +316,19 @@ int main(int argc, char *argv[])
     /*
      * Sign ELF
      */
-    } else if (sign_elf) {
-        elf_pathname = optparse_arg(&options);
-        if (elf_pathname == NULL) {
-            fprintf(stderr, "No ELF file argument\n");
-            return 1;
+    } else if (flag_sign_elf) {
+        if (!flag_sys) {
+            elf_pathname = optparse_arg(&options);
+            if (elf_pathname == NULL) {
+                fprintf(stderr, "No ELF file argument\n");
+                return 1;
+            }
+        } else {
+            elf_pathname = optparse_arg(&options);
+            if (elf_pathname == NULL) {
+                fprintf(stderr, "No target path argument\n");
+                return 1;
+            }
         }
         key_pathname = optparse_arg(&options);
         if (key_pathname == NULL) {
@@ -219,11 +336,12 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        if (flag_elf_rsa) {
-            return trace_error(keipm_set_Key(key_pathname, elf_pathname));
+        if (flag_sys) {
+            return sign_sys_elf(elf_pathname, key_pathname, flag_elf_rsa);
         } else {
-            return trace_error(keipm_set_UserCA(key_pathname, elf_pathname));
+            return sign_elf(elf_pathname, key_pathname, flag_elf_rsa);
         }
+        
     }
     
     return print_help(argv[0]);
