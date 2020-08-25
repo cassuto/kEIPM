@@ -92,30 +92,30 @@ static const char *get_suffix(const char *filename) {
     }
     return "";
 }
+static FILE *flist;
+static size_t root_path_len;
+
 static int prohibit_path(const char *path) {
-    if (strncmp(path, "/dev", sizeof("/dev")-1)==0) {
+    path += root_path_len;
+    if (strncmp(path, "dev", sizeof("dev")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/proc", sizeof("/proc")-1)==0) {
+    } else if (strncmp(path, "proc", sizeof("proc")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/tmp", sizeof("/tmp")-1)==0) {
+    } else if (strncmp(path, "tmp", sizeof("tmp")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/var", sizeof("/var")-1)==0) {
+    } else if (strncmp(path, "var", sizeof("var")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/lastore", sizeof("/lastore")-1)==0) {
+    } else if (strncmp(path, "lastore", sizeof("lastore")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/sys", sizeof("/sys")-1)==0) {
+    } else if (strncmp(path, "sys", sizeof("sys")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/mnt", sizeof("/mnt")-1)==0) {
+    } else if (strncmp(path, "mnt", sizeof("mnt")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/lost+found", sizeof("/lost+found")-1)==0) {
-        return 1;
-    } else if (strncmp(path, "/home", sizeof("/home")-1)==0) {
+    } else if (strncmp(path, "lost+found", sizeof("lost+found")-1)==0) {
         return 1;
     }
     return 0;
 }
-
-static FILE *flist;
 
 static void trave_dir(const char *path, const char *key_pathname, int rsa, long total, long *scan_count) {
     DIR *d = NULL;
@@ -161,7 +161,6 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
                 } else {
                     if (key_pathname==NULL) {
                         /* just see whether it's an ELF */
-                        //printf("%s\n", buf);
                         keipm_err_t ret = keipm_peak_elf(buf);
                         if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
                             printf("\033[0m\nFile: %s.", buf);
@@ -171,6 +170,9 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
                             fprintf(flist, "%s\n", buf);
                         }
                     } else {
+                        /*
+                         * Signature foreach file
+                         */
                         keipm_err_t ret = sign_elf(buf, key_pathname, rsa);
                         if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
                             printf("\033[0m\nFile: %s.", buf);
@@ -199,15 +201,18 @@ int scan_elf(const char *path, const char *outfile) {
         printf("Failed to open output file %s\n", outfile);
         return 1;
     }
+    root_path_len = strlen(path);
     trave_dir(path, NULL,0,  0,&total_num_files);
     printf("Totally %ld files to signature.\n", total_num_files);
     trave_dir(path, NULL,2, total_num_files,NULL);
     printf("\n");
+    fclose(flist);
     return 0;
 }
 
 int sign_sys_elf(const char *path, const char *key_pathname, int rsa) {
     long total_num_files = 0;
+    root_path_len = strlen(path);
     trave_dir(path, NULL,0,  0,&total_num_files);
     printf("Totally %ld files to signature.\n", total_num_files);
     trave_dir(path, key_pathname,0, total_num_files,NULL);
