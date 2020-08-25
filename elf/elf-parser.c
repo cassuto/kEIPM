@@ -23,7 +23,7 @@ keipm_err_t elf_parse(struct elf_op *parser)
     pos = 0;
     len = util_read(parser->fp, &parser->hdr, sizeof(parser->hdr), &pos);
 	if (len != sizeof(parser->hdr)) {
-        return ERROR(kEIPM_ERR_MALFORMED, "elf: can not read.");
+        return ERROR(kEIPM_ERR_NOT_ELF, "elf: can not read ELF header.");
 	}
     if (memcmp(parser->hdr.e_ident, ELFMAG, SELFMAG)) {
         return ERROR(kEIPM_ERR_NOT_ELF, "elf: invalid format");

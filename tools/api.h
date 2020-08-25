@@ -72,6 +72,7 @@ extern keipm_err_t keipm_create_rootCA(const char *rootCA_Path, const RootCa *ro
 */
 extern keipm_err_t keipm_create_userCA(const char *out_cert_path, const UserCa *userca);
 
+extern keipm_err_t keipm_peak_elf(const char *filename);
 
 #ifdef __cplusplus
 }

@@ -372,3 +372,25 @@ keipm_err_t keipm_set_UserCA(const char* UserCA_Path,const char* elf_Path)
 {
     return sign_elf(elf_Path, 0, UserCA_Path);
 }
+
+keipm_err_t keipm_peak_elf(const char *filename)
+{
+    keipm_err_t err;
+    struct elf_op elfop;
+    FILE *fp_elf_rd = fopen(filename, "rb");
+    if (!fp_elf_rd) {
+        err = ERROR(kEIPM_ERR_MALFORMED, "Failed to open");
+        goto out;
+    }
+    elf_setfile(&elfop, fp_elf_rd);
+    err = elf_parse(&elfop);
+    if (err.errno != kEIPM_OK) {
+        goto out;
+    }
+out:
+    if (fp_elf_rd) {
+        fclose(fp_elf_rd);
+    }
+    elf_exit(&elfop);
+    return err;
+}

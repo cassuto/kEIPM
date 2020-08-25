@@ -36,6 +36,7 @@ static struct optparse_long longopts[] = {
     {"sign", 'e', OPTPARSE_OPTIONAL},
     {"rsa", 'r', OPTPARSE_OPTIONAL},
     {"sys", 'a', OPTPARSE_OPTIONAL},
+    {"scan", '@', OPTPARSE_OPTIONAL},
 
     /* Certificate params */
     {"country", 't', OPTPARSE_OPTIONAL},
@@ -92,15 +93,29 @@ static const char *get_suffix(const char *filename) {
     return "";
 }
 static int prohibit_path(const char *path) {
-    if (strncmp(path, "/dev/", sizeof("/dev/")-1)==0) {
+    if (strncmp(path, "/dev", sizeof("/dev")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/proc/", sizeof("/dev/")-1)==0) {
+    } else if (strncmp(path, "/proc", sizeof("/proc")-1)==0) {
         return 1;
-    } else if (strncmp(path, "/tmp/", sizeof("/dev/")-1)==0) {
+    } else if (strncmp(path, "/tmp", sizeof("/tmp")-1)==0) {
+        return 1;
+    } else if (strncmp(path, "/var", sizeof("/var")-1)==0) {
+        return 1;
+    } else if (strncmp(path, "/lastore", sizeof("/lastore")-1)==0) {
+        return 1;
+    } else if (strncmp(path, "/sys", sizeof("/sys")-1)==0) {
+        return 1;
+    } else if (strncmp(path, "/mnt", sizeof("/mnt")-1)==0) {
+        return 1;
+    } else if (strncmp(path, "/lost+found", sizeof("/lost+found")-1)==0) {
+        return 1;
+    } else if (strncmp(path, "/home", sizeof("/home")-1)==0) {
         return 1;
     }
     return 0;
 }
+
+static FILE *flist;
 
 static void trave_dir(const char *path, const char *key_pathname, int rsa, long total, long *scan_count) {
     DIR *d = NULL;
@@ -136,18 +151,35 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
         if (S_ISLNK(st.st_mode))
             continue;
         if (!S_ISDIR(st.st_mode)) {
+            if (!S_ISREG(st.st_mode)) {
+                continue;
+            }
             /* check if it is a ELF file. ELF has no suffix */
             if (strcmp(get_suffix(buf), "")==0) {
                 if (scan_count) {
                     (*scan_count)++;
                 } else {
-                    keipm_err_t ret = sign_elf(buf, key_pathname, rsa);
-                    if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
-                        trace_error(ret);
-                        ++failed;
+                    if (key_pathname==NULL) {
+                        /* just see whether it's an ELF */
+                        //printf("%s\n", buf);
+                        keipm_err_t ret = keipm_peak_elf(buf);
+                        if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
+                            printf("\033[0m\nFile: %s.", buf);
+                            trace_error(ret);
+                            ++failed;
+                        } else {
+                            fprintf(flist, "%s\n", buf);
+                        }
+                    } else {
+                        keipm_err_t ret = sign_elf(buf, key_pathname, rsa);
+                        if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
+                            printf("\033[0m\nFile: %s.", buf);
+                            trace_error(ret);
+                            ++failed;
+                        }
                     }
                     ++curr;
-                    printf("\033[1;31;40m\rProgress: %.2f%% Failed %ld \033[0m", (double)curr/total*100, failed);
+                    printf("\033[1;31;40m\rProgress: %.2f%%(%ld/%ld) Failed %ld \033[0m", (double)curr/total*100, curr,total, failed);
                 }
             }
         } else {
@@ -159,12 +191,26 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
     closedir(d);
 }
 
+int scan_elf(const char *path, const char *outfile) {
+    long total_num_files = 0;
+
+    flist = fopen(outfile, "w");
+    if (!flist) {
+        printf("Failed to open output file %s\n", outfile);
+        return 1;
+    }
+    trave_dir(path, NULL,0,  0,&total_num_files);
+    printf("Totally %ld files to signature.\n", total_num_files);
+    trave_dir(path, NULL,2, total_num_files,NULL);
+    printf("\n");
+    return 0;
+}
 
 int sign_sys_elf(const char *path, const char *key_pathname, int rsa) {
     long total_num_files = 0;
     trave_dir(path, NULL,0,  0,&total_num_files);
     printf("Totally %ld files to signature.\n", total_num_files);
-    trave_dir(path, key_pathname,rsa, total_num_files,NULL);
+    trave_dir(path, key_pathname,0, total_num_files,NULL);
     printf("\n");
     return 0;
 }
@@ -180,6 +226,7 @@ int main(int argc, char *argv[])
     int flag_sign_elf = 0;
     int flag_elf_rsa = 0;
     int flag_sys = 0;
+    int flag_scan = 0;
     const char *privkey = NULL, *pubkey = NULL;
     const char *ca_pathname = NULL;
     const char *user_pathname = NULL;
@@ -187,6 +234,7 @@ int main(int argc, char *argv[])
         *org="None", *comname="None";
     const char *elf_pathname = NULL;
     const char *key_pathname = NULL;
+    const char *root_pathname = NULL, *outfile_pathname = NULL;
     int days = 30;
 
     optparse_init(&options, argv);
@@ -206,6 +254,10 @@ int main(int argc, char *argv[])
             break;
         case 'e':
             flag_sign_elf = 1;
+            break;
+
+        case '@':
+            flag_scan = 1;
             break;
 
         case 'r':
@@ -325,8 +377,8 @@ int main(int argc, char *argv[])
                 return 1;
             }
         } else {
-            elf_pathname = optparse_arg(&options);
-            if (elf_pathname == NULL) {
+            root_pathname = optparse_arg(&options);
+            if (root_pathname == NULL) {
                 fprintf(stderr, "No target path argument\n");
                 return 1;
             }
@@ -338,11 +390,23 @@ int main(int argc, char *argv[])
         }
 
         if (flag_sys) {
-            return sign_sys_elf(elf_pathname, key_pathname, flag_elf_rsa);
+            return sign_sys_elf(root_pathname, key_pathname, flag_elf_rsa);
         } else {
             return trace_error(sign_elf(elf_pathname, key_pathname, flag_elf_rsa));
         }
         
+    } else if (flag_scan) {
+        root_pathname = optparse_arg(&options);
+        if (root_pathname == NULL) {
+            fprintf(stderr, "No target path argument\n");
+            return 1;
+        }
+        outfile_pathname = optparse_arg(&options);
+        if (outfile_pathname == NULL) {
+            fprintf(stderr, "No target path argument\n");
+            return 1;
+        }
+        return scan_elf(root_pathname, outfile_pathname);
     }
     
     return print_help(argv[0]);
