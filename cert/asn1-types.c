@@ -453,6 +453,7 @@ asinine_strerror(asinine_err_t err) {
 		case_for_tag(ASININE_ERR_UNTRUSTED);
 		case_for_tag(ASININE_ERR_DEPRECATED);
 		case_for_tag(ASININE_ERR_NOT_FOUND);
+		case_for_tag(kEIPM_ERR_NOT_ELF);
 	}
 #undef case_for_tag
 	return "(INVALID)";

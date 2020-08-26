@@ -18,6 +18,8 @@
 #include <linux/limits.h>
 #include <linux/string.h>
 #include <linux/fs.h>
+#include <linux/mutex.h>
+#include <linux/spinlock.h>
 #include <asm/page.h>
 #include "ksyms.h"
 #include "validator.h"
@@ -29,6 +31,9 @@ static uintptr_t p_load_elf_library;
 static uintptr_t *pp_elf_format_load_elf_binary, *pp_elf_format_load_elf_library;
 static char pathname[PATH_MAX];
 static bool watcher_hooked = false;
+static size_t load_elf_binary_last_pn[2];
+static struct spinlock last_pn_spin;
+static struct mutex validator_mutex;
 
 typedef int (*pfn_load_elf_binary)(struct linux_binprm *bprm);
 typedef int (*pfn_load_elf_library)(struct file *file);
@@ -48,7 +53,7 @@ static int copy_path_from_kernel(uintptr_t ptr, char buf[PATH_MAX])
     if(ptr < PAGE_OFFSET) { /* check if a kernel pointer */
         return -EFAULT;
     }
-    if(*s!='/') { /* check if is a pathname */
+    if(*s!='/' && strncmp(s,"./",2)!=0 && strncmp(s,"../",3)!=0) { /* check if is a pathname */
         return -EFAULT;
     }
     while(*s && count<PATH_MAX) {
@@ -59,22 +64,58 @@ static int copy_path_from_kernel(uintptr_t ptr, char buf[PATH_MAX])
     return 0;
 }
 
+static int trace_file(const char *pathname)
+{
+    int ret = 0;
+    struct file *file;
+    if (verify_fs(pathname).errno ==kEIPM_OK) {
+        /*
+        * Parse the traced file
+        * that file indicated by pathname may be not an ELF.
+        */
+        file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
+        if (IS_ERR(file)) {
+            return 0;
+        }
+        /*
+         × Enter to critical region
+         * Validator is non reentrant
+         */
+        mutex_lock(&validator_mutex);
+        if(validator_analysis_binary(file)) {
+            printk("%s signature invalid", pathname);
+            ret = -EPERM;
+        }
+        mutex_unlock(&validator_mutex);
+
+        filp_close(file, NULL);
+    }
+    return ret;
+}
+
 /**
  * @brief Hooker handler of kernel load_elf_binary()
  */
 static int on_load_elf_binary(struct linux_binprm *bprm)
 {
+    int ret;
+    int pathname_found = 0;
     size_t num_traced_pathname = 0;
     const char *traced_file;
     pfn_load_elf_binary org = (pfn_load_elf_binary)p_load_elf_binary;
     size_t i;
-    struct file *file;
 
     /* pointers in linux_binprm are aligned at 8 bytes boundary */
     uintptr_t *s = (uintptr_t *)bprm;
 
     for(i=0;i<sizeof(struct linux_binprm)/sizeof(uintptr_t);++i) {
         if(!copy_path_from_kernel(s[i], pathname)) {
+            /* Update bakcup indexes */
+            spin_lock(&last_pn_spin);
+            if (load_elf_binary_last_pn[num_traced_pathname] == -1) {
+                load_elf_binary_last_pn[num_traced_pathname] = i;
+            }
+            spin_unlock(&last_pn_spin);
             /*
              * Check whether this pathname has been already processed.
              * This is because linux_binprm takes two fields to hold 
@@ -87,22 +128,27 @@ static int on_load_elf_binary(struct linux_binprm *bprm)
                     break;
                 }
             }
+            pathname_found = 1;
             traced_file = pathname;
-            if (verify_fs(pathname).errno ==kEIPM_OK) {
-                /*
-                * Parse the traced file
-                * that file indicated by pathname may be not an ELF.
-                */
-                file = filp_open(pathname, O_LARGEFILE | O_RDONLY, S_IRUSR);
-                if (IS_ERR(file)) {
-                    return 0;
+            ret = trace_file(traced_file);
+            if (ret) {
+                return ret;
+            }
+            if (num_traced_pathname == 2) {
+                break;
+            }
+        }
+    }
+
+    /* Not found. Using backup values */
+    if (!pathname_found) {
+        for(i=0;i<2;++i) {
+            if((load_elf_binary_last_pn[i] != -1)
+                    && !copy_path_from_kernel(s[load_elf_binary_last_pn[i]], pathname)) {
+                ret = trace_file(traced_file);
+                if (ret) {
+                    return ret;
                 }
-                if(validator_analysis_binary(file)) {
-                    filp_close(file, NULL);
-                    printk("%s signature invalid", pathname);
-                    return -EPERM;
-                }
-                filp_close(file, NULL);
             }
         }
     }
@@ -129,6 +175,13 @@ keipm_err_t watcher_init(void)
     if (watcher_hooked) {
         return ERROR(kEIPM_OK, NULL);
     }
+
+    for(i=0;i<2;++i) {
+        load_elf_binary_last_pn[i] = -1;
+    }
+
+    spin_lock_init(&last_pn_spin);
+    mutex_init(&validator_mutex);
 
     p_elf_format = (uintptr_t)find_kernel_entry("elf_format");
     p_load_elf_binary = (uintptr_t)find_kernel_entry("load_elf_binary");

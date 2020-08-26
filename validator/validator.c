@@ -35,7 +35,7 @@
 /** Define max size of signature data in bytes */
 #define MAX_ENC_DIGEST_BUFFER 65536
 /** Define size of file chunk for SHA */
-#define SHA_FILE_CHUNK_SIZE 65536
+#define SHA_FILE_CHUNK_SIZE 262144
 
 typedef struct pubkey_info {
     char *              issuer;
@@ -299,7 +299,7 @@ int validator_analysis_binary(struct file *file)
     if (err.errno != kEIPM_OK) {
         printk(KERN_WARNING kEIPM "errno = (%d) %s\n", err.errno, err.reason);
     }
-    retval = (err.errno == kEIPM_OK) ? 0 : -ENOEXEC;
+    retval = (err.errno == kEIPM_OK) ? 0 : -EPERM;
 out:
     elf_exit(&ep);
     return retval;

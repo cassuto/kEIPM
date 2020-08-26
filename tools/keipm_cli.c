@@ -84,14 +84,6 @@ static keipm_err_t sign_elf(const char *elf_pathname, const char *key_pathname, 
     }
 }
 
-static const char *get_suffix(const char *filename) {
-    for(int i=strlen(filename)-1;i>=0;--i) {
-        if (filename[i]=='.') {
-            return &filename[i]+1;
-        }
-    }
-    return "";
-}
 static FILE *flist;
 static size_t root_path_len;
 
@@ -154,35 +146,32 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
             if (!S_ISREG(st.st_mode)) {
                 continue;
             }
-            /* check if it is a ELF file. ELF has no suffix */
-            if (strcmp(get_suffix(buf), "")==0 || strcmp(get_suffix(buf), "so")==0) {
-                if (scan_count) {
-                    (*scan_count)++;
-                } else {
-                    if (key_pathname==NULL) {
-                        /* just see whether it's an ELF */
-                        keipm_err_t ret = keipm_peak_elf(buf);
-                        if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
-                            printf("\033[0m\nFile: %s.", buf);
-                            trace_error(ret);
-                            ++failed;
-                        } else if (ret.errno!=kEIPM_ERR_NOT_ELF) {
-                            fprintf(flist, "%s\n", buf);
-                        }
-                    } else {
-                        /*
-                         * Signature foreach file
-                         */
-                        keipm_err_t ret = sign_elf(buf, key_pathname, rsa);
-                        if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
-                            printf("\033[0m\nFile: %s.", buf);
-                            trace_error(ret);
-                            ++failed;
-                        }
+            if (scan_count) {
+                (*scan_count)++;
+            } else {
+                if (key_pathname==NULL) {
+                    /* just see whether it's an ELF */
+                    keipm_err_t ret = keipm_peak_elf(buf);
+                    if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
+                        printf("\033[0m\nFile: %s.", buf);
+                        trace_error(ret);
+                        ++failed;
+                    } else if (ret.errno!=kEIPM_ERR_NOT_ELF) {
+                        fprintf(flist, "%s\n", buf);
                     }
-                    ++curr;
-                    printf("\033[1;31;40m\rProgress: %.2f%%(%ld/%ld) Failed %ld \033[0m", (double)curr/total*100, curr,total, failed);
+                } else {
+                    /*
+                    * Signature foreach file
+                    */
+                    keipm_err_t ret = sign_elf(buf, key_pathname, rsa);
+                    if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
+                        printf("\033[0m\nFile: %s.", buf);
+                        trace_error(ret);
+                        ++failed;
+                    }
                 }
+                ++curr;
+                printf("\033[1;31;40m\rProgress: %.2f%%(%ld/%ld) Failed %ld \033[0m", (double)curr/total*100, curr,total, failed);
             }
         } else {
             if (!prohibit_path(buf)) {
