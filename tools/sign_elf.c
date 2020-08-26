@@ -112,7 +112,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
     struct stat statbuf;
 
     err = check_prev_sig(target_elf);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         goto out;
     }
 
@@ -121,7 +121,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
      */
     snprintf(backup_pathname, sizeof(backup_pathname), "%s.bak", target_elf);
     err = copy_file(target_elf, backup_pathname);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         goto out;
     }
 
@@ -135,7 +135,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
     }
     elf_setfile(&elfop, fp_elf_rd);
     err = elf_parse(&elfop);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         goto out;
     }
 
@@ -193,7 +193,7 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
 
     /* create new ELF file based on the original */
     err = elf_write_signature_section(&elfop, fp_elf_wb, SIG_ELF_SECTION_NAME, sig_section_buff, sig_section_size, &sig_section_foff);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         goto out;
     }
 
@@ -203,11 +203,11 @@ static keipm_err_t sign_elf(const char *target_elf, uint8_t by_rsa, const char *
     elf_exit(&elfop);
     elf_setfile(&elfop, fp_elf_wb);
     err = elf_parse(&elfop);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         goto out;
     }
     err = hash_elf(&elfop, elf_digest);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         goto out;
     }
 
@@ -307,11 +307,11 @@ static keipm_err_t check_prev_sig(const char *target_elf)
     }
     elf_setfile(&elfop, fp);
     err = elf_parse(&elfop);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         goto out;
     }
     err = elf_find_section(&elfop, SIG_ELF_SECTION_NAME ,SHT_PROGBITS, &sec_offset, &sec_len);
-    if (err.errno == kEIPM_OK) {
+    if (err.errn == kEIPM_OK) {
         err = ERROR(kEIPM_ERR_INVALID, "The ELF file has already been signed. Please check.");
         goto out;
     }
@@ -384,7 +384,7 @@ keipm_err_t keipm_peak_elf(const char *filename)
     }
     elf_setfile(&elfop, fp_elf_rd);
     err = elf_parse(&elfop);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         goto out;
     }
 out:

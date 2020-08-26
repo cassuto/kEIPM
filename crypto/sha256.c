@@ -21,6 +21,12 @@
 #ifdef __KERNEL__
 #include <asm/unaligned.h>
 #include <linux/kernel.h>
+#else
+#	ifdef FEATURE_BIG_ENDIAN
+#		include <linux/byteorder/big_endian.h>
+#	else
+#		include <linux/byteorder/little_endian.h>
+#	endif
 #endif
 #include "sha.h"
 
@@ -47,6 +53,36 @@ static inline u32 Maj(u32 x, u32 y, u32 z)
 {
 	return (x & y) | (z & (x | y));
 }
+
+/*
+ * User space compact
+ */
+#ifndef __KERNEL__
+struct __una_u32 { u32 x; } __packed;
+static inline u32 __get_unaligned_cpu32(const void *p)
+{
+    const struct __una_u32 *ptr = (const struct __una_u32 *)p;
+    return ptr->x;
+}
+static inline u32 get_unaligned_be32(const void *p)
+{
+    return __get_unaligned_cpu32((const u8 *)p);
+}
+
+/**
+ * ror32 - rotate a 32-bit value right
+ * @word: value to rotate
+ * @shift: bits to roll
+ */
+static inline __u32 ror32(__u32 word, unsigned int shift)
+{
+	return (word >> (shift & 31)) | (word << ((-shift) & 31));
+}
+
+#define cpu_to_be64 __cpu_to_be64
+
+#define memzero_explicit(_dst, _len) memset(_dst,0,_len)
+#endif
 
 #define e0(x)       (ror32(x, 2) ^ ror32(x,13) ^ ror32(x,22))
 #define e1(x)       (ror32(x, 6) ^ ror32(x,11) ^ ror32(x,25))

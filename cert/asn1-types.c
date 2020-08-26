@@ -143,7 +143,7 @@ asn1_string(const asn1_token_t *token, char *buf, size_t len) {
 
 bool
 asn1_string_eq(const asn1_token_t *token, const char *str) {
-	if (validate_string(token).errno != ASININE_OK) {
+	if (validate_string(token).errn != ASININE_OK) {
 		return false;
 	}
 
@@ -443,7 +443,7 @@ asinine_strerror(asinine_err_t err) {
 #define case_for_tag(x) \
 	case x: \
 		return #x
-	switch (err.errno) {
+	switch (err.errn) {
 		case_for_tag(ASININE_OK);
 		case_for_tag(ASININE_ERR_MALFORMED);
 		case_for_tag(ASININE_ERR_MEMORY);

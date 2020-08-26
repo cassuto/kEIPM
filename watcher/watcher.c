@@ -68,7 +68,7 @@ static int trace_file(const char *pathname)
 {
     int ret = 0;
     struct file *file;
-    if (verify_fs(pathname).errno ==kEIPM_OK) {
+    if (verify_fs(pathname).errn ==kEIPM_OK) {
         /*
         * Parse the traced file
         * that file indicated by pathname may be not an ELF.

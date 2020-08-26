@@ -5,6 +5,7 @@ if [ -z "$1" ] ; then
 fi
 
 TARGET_UNAME=`uname -r`
+# Install kernel module
 cp ./share/keipm.conf $1/etc/modules-load.d/keipm.conf
 if [ "$?" != 0 ] ; then
    exit $?
@@ -13,7 +14,7 @@ cp ./bin/keipm.ko $1/lib/modules/$TARGET_UNAME/keipm.ko
 if [ "$?" != 0 ] ; then
    exit $?
 fi
-# Auto install module
+# Auto load module when system booting
 CMD_INSMOD="/sbin/insmod /lib/modules/$TARGET_UNAME/keipm.ko"
 echo Install kernel module....
 echo "#!/bin/sh -e" > $1/etc/rc.local
@@ -22,6 +23,12 @@ if [ "$?" != 0 ] ; then
    exit $?
 fi
 chmod +x $1/etc/rc.local
+if [ "$?" != 0 ] ; then
+   exit $?
+fi
+# Install ld.so
+echo Install ld.so...
+cp ./share/ld-2.24.so $1/lib/x86_64-linux-gnu/ld-2.24.so
 if [ "$?" != 0 ] ; then
    exit $?
 fi

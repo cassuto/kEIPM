@@ -68,12 +68,12 @@ static int print_help(const char *prog)
 
 static int trace_error(keipm_err_t err)
 {
-    if (err.errno) {
+    if (err.errn) {
         printf("\033[0m\nError: %s.\n", err.reason ? err.reason : "Succeeded");
     } else {
         printf("\033[0m\n%s. \n", err.reason ? err.reason : "Succeeded");
     }
-    return err.errno;
+    return err.errn;
 }
 
 static keipm_err_t sign_elf(const char *elf_pathname, const char *key_pathname, int rsa) {
@@ -152,11 +152,11 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
                 if (key_pathname==NULL) {
                     /* just see whether it's an ELF */
                     keipm_err_t ret = keipm_peak_elf(buf);
-                    if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
+                    if (ret.errn && ret.errn!=kEIPM_ERR_NOT_ELF) {
                         printf("\033[0m\nFile: %s.", buf);
                         trace_error(ret);
                         ++failed;
-                    } else if (ret.errno!=kEIPM_ERR_NOT_ELF) {
+                    } else if (ret.errn!=kEIPM_ERR_NOT_ELF) {
                         fprintf(flist, "%s\n", buf);
                     }
                 } else {
@@ -164,7 +164,7 @@ static void trave_dir(const char *path, const char *key_pathname, int rsa, long 
                     * Signature foreach file
                     */
                     keipm_err_t ret = sign_elf(buf, key_pathname, rsa);
-                    if (ret.errno && ret.errno!=kEIPM_ERR_NOT_ELF) {
+                    if (ret.errn && ret.errn!=kEIPM_ERR_NOT_ELF) {
                         printf("\033[0m\nFile: %s.", buf);
                         trace_error(ret);
                         ++failed;
@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
         }
 
         err = keipm_create_PrivateKey(privkey);
-        if (err.errno != kEIPM_OK) {
+        if (err.errn != kEIPM_OK) {
             return trace_error(err);
         }
 

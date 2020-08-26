@@ -1,8 +1,13 @@
 #ifndef PKCS1_H_
 #define PKCS1_H_
 
+#ifdef __KERNEL__
 #include <linux/types.h>
 #include <linux/errno.h>
+#else
+#include <stdint.h>
+#include <errno.h>
+#endif
 
 /*
  * Top level OID tuples

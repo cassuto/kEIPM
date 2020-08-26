@@ -2,12 +2,12 @@
 #define ERRORS_H_
 
 #define ERROR(e, r) \
-	(keipm_err_t) { .errno = e, .reason = r }
+	(keipm_err_t) { .errn = e, .reason = r }
 
 #define RETURN_ON_ERROR(expr) \
 	do { \
 		keipm_err_t ret_##__LINE__ = expr; \
-		if (ret_##__LINE__.errno != kEIPM_OK) { \
+		if (ret_##__LINE__.errn != kEIPM_OK) { \
 			return ret_##__LINE__; \
 		} \
 	} while (0)
@@ -26,7 +26,7 @@ typedef enum keipm_errno {
 } keipm_errno_t;
 
 typedef struct keipm_err {
-	keipm_errno_t errno;
+	keipm_errno_t errn;
 	const char *reason;
 } keipm_err_t;
 

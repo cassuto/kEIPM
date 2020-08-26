@@ -90,7 +90,7 @@ keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const 
 
     /* check if target section is existed */
     res = elf_find_section(ep,name,tshdr.sh_type,&sh_off,&sh_size);
-    if (res.errno == kEIPM_OK) {
+    if (res.errn == kEIPM_OK) {
         return ERROR(kEIPM_ERR_MALFORMED, "elf: section is existed");
     }
 
@@ -100,7 +100,7 @@ keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const 
 
     ep->shdrs = NULL;
     res = elf_read_shdr(ep);
-    if (res.errno != kEIPM_OK) {
+    if (res.errn != kEIPM_OK) {
         goto out;
     }
 
@@ -142,7 +142,7 @@ keipm_err_t elf_write_signature_section(struct elf_op *ep, util_fp_t wfp, const 
 
         /* copy the original shstrtab to new offset */
         res = copy_section(ep->fp, tshstr.sh_offset, tshstr.sh_size, wfp, pos);
-        if (res.errno != kEIPM_OK) {
+        if (res.errn != kEIPM_OK) {
             goto out;
         }
 

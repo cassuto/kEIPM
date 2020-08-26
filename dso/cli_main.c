@@ -12,45 +12,31 @@
  *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU      
  *  Lesser General Public License for more details.                        
  */
-#include <linux/module.h>
-#include <linux/init.h>
-#include <linux/kernel.h>
-
-#include "keipm.h"
-#include "watcher.h"
 #include "validator.h"
 
-MODULE_AUTHOR ("cassuto <diyer175@hotmail.com>");
-MODULE_DESCRIPTION ("kernel ELF Integrity Protection Module");
-MODULE_LICENSE("GPL");
-MODULE_VERSION("1.0.0");
-
-static void trace_error(keipm_err_t err);
-
-static int __init keipm_init(void)
+int main(int argc, char *argv[])
 {
-    /* banner */
-    printk(KERN_INFO kEIPM "module loaded.\n");
-    
+    int ret;
+    FILE *fp = NULL;
+    if (argc != 2) {
+        fprintf(stderr, "Invalid args!\n");
+        return 1;
+    }
     validator_init();
 
-    trace_error(watcher_init());
+    fp = fopen(argv[1], "rb");
+    if (!fp) {
+        fprintf(stderr, "Can not open %s!\n", argv[1]);
+        return 1;
+    }
+
+    ret = validator_analysis_binary(fp);
+    if (ret) {
+        printf("Invalid!\n");
+    } else {
+        printf("Valid!\n");
+    }
+
+    fclose(fp);
     return 0;
 }
-
-static void __exit keipm_exit(void)
-{
-    printk(KERN_INFO kEIPM "%s\n", __func__);
-    watcher_uninit();
-}
-
-module_init(keipm_init);
-module_exit(keipm_exit);
-
-static void trace_error(keipm_err_t err)
-{
-    if(err.errn != kEIPM_OK) {
-        printk(KERN_ERR kEIPM "%s", err.reason);
-    }
-}
-

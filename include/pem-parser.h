@@ -1,7 +1,11 @@
 #ifndef PEM_PARSER_H
 #define PEM_PARSER_H
 
+#ifdef __KERNEL__
 #include <linux/types.h>
+#else
+#include "utils.h"
+#endif
 #include "errors.h"
 
 struct pem_key {

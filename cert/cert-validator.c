@@ -7,12 +7,18 @@
 #include "asn1-parser/x509.h"
 #include "asn1-parser/internal/macros.h"
 #include "sha.h"
+#ifdef __KERNEL__
 #include "rsa.h"
+#else
+#include "user/rsa.h"
+#endif
 #include "pkcs1.h"
 
 #ifdef __KERNEL__
 #include <linux/time.h>
 #include <linux/rtc.h>
+#else
+#include <time.h>
 #endif
 
 #include "cert-validator.h"
@@ -39,6 +45,7 @@ static keipm_err_t validate_rsa_signature(const x509_pubkey_t *pubkey, x509_pubk
     const x509_signature_t *sig, const uint8_t *hash, size_t hash_len,
     const uint8_t *oid, size_t oid_len)
 {
+#ifdef __KERNEL__
     keipm_err_t res;
     struct rsa_req rsa;
     struct rsa_key raw_key;
@@ -84,6 +91,46 @@ error:
     kfree(rsa.dst);
 	rsa_exit_req(&rsa);
 	return res;
+
+#else
+    keipm_err_t res;
+    int ret;
+    rsa_pk_t pk;
+    uint8_t out[RSA_MAX_MODULUS_LEN];
+    uint32_t out_len;
+int i;
+    /*
+     * Fill public key
+     */
+    if (pubkey->key.rsa.n_num > sizeof(pk.modulus)) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: modulus too large");
+        goto out;
+    }
+    memcpy(pk.modulus, pubkey->key.rsa.n, pubkey->key.rsa.n_num);
+    if (pubkey->key.rsa.e_num > sizeof(pk.exponent)) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: exponent too large");
+        goto out;
+    }
+    memcpy(pk.exponent, pubkey->key.rsa.e, pubkey->key.rsa.e_num);
+    pk.bits = rsa_get_bits(pubkey->key.rsa.n_num);
+
+    ret = rsa_public_decrypt(out, &out_len, sig->data, sig->num, &pk);
+    if (ret) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: verify failed");
+        goto out;
+    }
+
+for(i=0;i<out_len;++i)
+printf("%x ", out[i]);
+    if (pkcs1_verify(out, out_len, oid, oid_len, hash, hash_len)) {
+		res = ERROR(ASININE_ERR_UNTRUSTED, "rsa: signature not valid");
+		goto out;
+	}
+
+	res = ERROR(ASININE_OK, NULL);
+out:
+    return res;
+#endif
 }
 
 /* IMPORTANT! This is NOT reenterable */
@@ -111,7 +158,7 @@ keipm_err_t validate_signature(const x509_pubkey_t *pubkey, x509_pubkey_params_t
         sha256_finalize(&sha256_sst, sha256_block);
         sha256_fill_digest(&sha256_sst, hash);
         hash_len = SHA256_DIGEST_SIZE;
-        oid = OID_DIGEST_ALG_SHA256;
+        oid = (const unsigned char *)OID_DIGEST_ALG_SHA256;
         oid_size = sizeof(OID_DIGEST_ALG_SHA256) - 1;
 		break;
     }
@@ -176,7 +223,7 @@ keipm_err_t cert_validate(const uint8_t *trust, size_t trust_length,
     get_current_time(&now);
 
     err = find_issuer(trust, trust_length, cert, &issuer);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         return err;
     }
 
@@ -184,7 +231,7 @@ keipm_err_t cert_validate(const uint8_t *trust, size_t trust_length,
 
     while (!asn1_end(parser)) {
         err = x509_path_add(&path, cert);
-        if (err.errno != kEIPM_OK) {
+        if (err.errn != kEIPM_OK) {
             return err;
         }
 

@@ -17,13 +17,21 @@
 #include "asn1-parser/x509.h"
 #include "asn1-parser/internal/macros.h"
 #include "elf-op.h"
+#ifdef __KERNEL__
 #include "rsa.h"
+#else
+#include "user/rsa.h"
+#endif
 #include "sha.h"
 #include "signature.h"
 #include "pem-parser.h"
 #include "keipm.h"
+#ifdef __KERNEL__
 #include <linux/string.h>
-
+#else
+#include <string.h>
+#endif
+#include "../builtin/builtin.h"
 #include "validator.h"
 
 /** Define max number of public keys built-in this module */
@@ -100,6 +108,7 @@ static keipm_err_t verify_rsa_sign_(
     const uint8_t *modulus, size_t modulus_len,
     const uint8_t *public_exponent, size_t public_exponent_len)
 {
+#ifdef __KERNEL__
     keipm_err_t res;
     struct rsa_req rsa;
     struct rsa_key raw_key;
@@ -125,7 +134,7 @@ static keipm_err_t verify_rsa_sign_(
     rsa.src = edigest;
     rsa.src_len = edigest_len;
     rsa.dst_len = maxsize;
-    rsa.dst = kmalloc(rsa.dst_len, GFP_KERNEL);
+    rsa.dst = (u8 *)kmalloc(rsa.dst_len, GFP_KERNEL);
     if (rsa_verify(&rsa)) {
         res = ERROR(kEIPM_ERR_MALFORMED, "rsa: unexpected error");
         goto out;
@@ -146,6 +155,47 @@ out:
     rsa_exit_req(&rsa);
 
     return res;
+#else
+    keipm_err_t res;
+    int ret;
+    rsa_pk_t pk;
+    uint8_t out[RSA_MAX_MODULUS_LEN];
+    uint32_t out_len;
+
+    /*
+     * Fill public key
+     */
+    if (modulus_len > sizeof(pk.modulus)) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: modulus too large");
+        goto out;
+    }
+    memcpy(pk.modulus, modulus, modulus_len);
+    if (public_exponent_len > sizeof(pk.exponent)) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: exponent too large");
+        goto out;
+    }
+    memcpy(pk.exponent, public_exponent, public_exponent_len);
+    pk.bits = rsa_get_bits(modulus_len);
+
+    ret = rsa_public_decrypt(out, &out_len, edigest, edigest_len, &pk);
+    if (ret) {
+        res = ERROR(kEIPM_ERR_MALFORMED, "rsa: verify failed");
+        goto out;
+    }
+
+    /* anti leading ZERO padding */
+    if ((out_len >= sizeof(vld.hash))
+            && (memcmp(out+(out_len-sizeof(vld.hash)), vld.hash, sizeof(vld.hash)) == 0)) {
+        res = ERROR(kEIPM_OK, NULL);
+        goto out;
+    } else {
+        res = ERROR(kEIPM_ERR_UNTRUSTED, "signature not valid");
+    }
+
+	res = ERROR(kEIPM_OK, NULL);
+out:
+    return res;
+#endif
 }
 
 static keipm_err_t verify_rsa_signature(const uint8_t *edigest, size_t edigest_len)
@@ -160,7 +210,7 @@ static keipm_err_t verify_rsa_signature(const uint8_t *edigest, size_t edigest_l
                 vld.pubkeys[i].key.modulus_len,
                 vld.pubkeys[i].key.public_exponent,
                 vld.pubkeys[i].key.public_exponent_len);
-        if (err.errno == kEIPM_OK) {
+        if (err.errn == kEIPM_OK) {
             return err;
         }
     }
@@ -191,7 +241,7 @@ static keipm_err_t verify_cert_signature(const uint8_t *cert_data, size_t cert_l
     for(i=0; i<vld.num_cert;++i) {
         err = cert_validate(vld.certs[i].data, vld.certs[i].length,
                         &parser, &cert);
-        if (err.errno == kEIPM_OK) {
+        if (err.errn == kEIPM_OK) {
             return verify_rsa_sign_(
                 edigest, edigest_len,
                 cert.pubkey.key.rsa.n, cert.pubkey.key.rsa.n_num,
@@ -216,7 +266,7 @@ static keipm_err_t validate_elf(struct elf_op *parser)
     ssize_t len;
 
     err = elf_find_section(parser, SIG_ELF_SECTION_NAME, SHT_PROGBITS, &sig_section_off, &sig_section_size);
-    if (err.errno != kEIPM_OK) {
+    if (err.errn != kEIPM_OK) {
         return ERROR(kEIPM_ERR_INVALID, "elf: no signature");
     }
     if (sig_section_size < sizeof(sig_hdr)) {
@@ -283,31 +333,68 @@ static keipm_err_t validate_elf(struct elf_op *parser)
     return ERROR(kEIPM_OK, NULL);
 }
 
-int validator_analysis_binary(struct file *file)
+int validator_analysis_binary(util_fp_t file)
 {
     int retval;
     keipm_err_t err;
     struct elf_op ep;
     elf_setfile(&ep, file);
     err = elf_parse(&ep);
-    if (err.errno != kEIPM_OK) { /* If not a valid ELF file */
+    if (err.errn != kEIPM_OK) { /* If not a valid ELF file */
         retval = 0;
         goto out;
     }
     err = validate_elf(&ep);
 
-    if (err.errno != kEIPM_OK) {
-        printk(KERN_WARNING kEIPM "errno = (%d) %s\n", err.errno, err.reason);
+#ifdef __KERNEL__
+    if (err.errn != kEIPM_OK) {
+        printk(KERN_WARNING kEIPM "errn = (%d) %s\n", err.errn, err.reason);
     }
-    retval = (err.errno == kEIPM_OK) ? 0 : -EPERM;
+#else
+    if (err.errn != kEIPM_OK) {
+        printf("errn = (%d) %s\n", err.errn, err.reason);
+    }
+#endif
+    retval = (err.errn == kEIPM_OK) ? 0 : -EPERM;
 out:
     elf_exit(&ep);
     return retval;
 }
 
 void validator_init(void) {
+    int i;
     vld.num_pubkey = 0;
     vld.num_cert = 0;
+
+    /*
+     * Load built-in certificates or RSA public keys
+     */
+    for(i=0;i<builtin_num; ++i) {
+        keipm_err_t err;
+        const char *typestr = "unknown";
+        switch (builtin_list[i].type) {
+            case BUILTIN_RSA_PUBKEY:
+                typestr = "RSA pubkey";
+                err = validator_add_pubkey(builtin_list[i].issuer, builtin_list[i].data, builtin_list[i].length);
+                break;
+            case BUILTIN_CERT:
+                typestr = "certificate";
+                err = validator_add_root_cert(builtin_list[i].issuer, builtin_list[i].data, builtin_list[i].length);
+                break;
+            default:
+                continue;
+        }
+#ifdef __KERNEL__
+        if (err.errn == kEIPM_OK) {
+            printk(KERN_INFO kEIPM "Loaded built-in: %s - %s\n", typestr, builtin_list[i].issuer);
+        } else {
+            printk(KERN_INFO kEIPM "Failed on %s - %s: err=%d\n", typestr, builtin_list[i].issuer, err.errn);
+        }
+#else
+        (void)typestr;
+        (void)err;
+#endif
+    }
 }
 
 keipm_err_t verify_fs(const char *pathname) {

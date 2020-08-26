@@ -1,8 +1,9 @@
 #ifndef UTILS_H_
 #define UTILS_H_
 
-#ifdef __KERNEL__
 #include <linux/types.h>
+
+#ifdef __KERNEL__
 #include <linux/string.h>
 #else
 #include <stdint.h>
@@ -46,6 +47,27 @@ extern size_t util_filesize(util_fp_t fp);
 #endif
 #ifndef MIN
 #define MIN(a, b) (((a) < (b)) ? a : b)
+#endif
+
+
+#ifndef __KERNEL__
+    typedef uint8_t u8;
+    typedef uint16_t u16;
+    typedef uint32_t u32;
+    typedef uint64_t u64;
+    typedef int8_t s8;
+    typedef int16_t s16;
+    typedef int32_t s32;
+    typedef int64_t s64;
+
+#   ifndef EPERM
+#   define EPERM 1
+#   endif
+
+#   ifndef unlikely
+#   define unlikely(_x) (_x)
+#   endif
+
 #endif
 
 #endif // UTILS_H_

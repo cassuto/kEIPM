@@ -11,6 +11,9 @@ extern "C" {
 #include "errors.h"
 #include "asn1-parser/types.h"
 #include "asn1-parser/macros.h"
+#ifndef __KERNEL__
+#include <assert.h>
+#endif
 
 #define ASN1_OID(...) \
 	{ \

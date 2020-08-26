@@ -54,7 +54,7 @@ keipm_err_t pem_key_parse(struct pem_key *pem, bool private, const uint8_t *dat,
     /* skip pem footer */
     base64_len = 0;
     for(i=header_size;i<dat_len-footer_size;++i) {
-        if (strncmp(dat+i, footer, footer_size)==0) {
+        if (strncmp((const char *)dat+i, footer, footer_size)==0) {
             base64_len = i-header_size;
             break;
         }
@@ -63,7 +63,7 @@ keipm_err_t pem_key_parse(struct pem_key *pem, bool private, const uint8_t *dat,
         return ERROR(kEIPM_ERR_INVALID, "pem: invalid footer of file");
     }
 
-    pem->buffer_size = base64_decode(dat+header_size, base64_len, pem->buffer);
+    pem->buffer_size = base64_decode((const char *)dat+header_size, base64_len, pem->buffer);
     if (!pem->buffer_size) {
         return ERROR(kEIPM_ERR_INVALID, "pem: not base64 encoded");
     }
